@@ -1,102 +1,150 @@
-/* Progressive enhancement: client-side filtering + sorting of vacancy cards.
-   With JavaScript off, every card is already in the page (server-rendered) and
-   the browser's own find works. This only adds instant narrowing on top. */
+/* Progressive enhancement: filter, sort and paginate the vacancy list.
+   With JavaScript off, every row is already in the page (server-rendered) and
+   the browser's own find works; this only adds instant narrowing + paging. */
 (function () {
   "use strict";
-  var grid = document.getElementById("job-grid");
-  if (!grid) return;
+  var list = document.getElementById("job-list");
+  if (!list) return;
 
-  var cards = Array.prototype.slice.call(grid.querySelectorAll(".card"));
+  var PAGE_SIZE = 20;
+  var rows = Array.prototype.slice.call(list.querySelectorAll(".job-row"));
+  var today = list.getAttribute("data-today") || "";
+  var soonCutoff = list.getAttribute("data-soon") || "";
+
   var q = document.getElementById("q");
-  var fProvince = document.getElementById("f-province");
-  var fCategory = document.getElementById("f-category");
-  var fLevel = document.getElementById("f-level");
+  var fDept = document.getElementById("f-department");
+  var fCat = document.getElementById("f-category");
+  var fProv = document.getElementById("f-province");
+  var fSalary = document.getElementById("f-salary");
   var fSoon = document.getElementById("f-soon");
   var sortSel = document.getElementById("sort");
   var reset = document.getElementById("reset");
-  var count = document.getElementById("result-count");
-  var empty = document.getElementById("empty-state");
-  var today = grid.getAttribute("data-today") || "";
+  var countEl = document.getElementById("result-count");
+  var emptyEl = document.getElementById("empty-state");
+  var pager = document.getElementById("pager");
 
-  function soonCutoff() {
-    if (!today) return "";
-    var d = new Date(today + "T00:00:00");
-    d.setDate(d.getDate() + 14);
-    return d.toISOString().slice(0, 10);
+  var page = 1;
+  var matched = [];
+
+  // Collapsible filter panel (open on desktop, collapsed on small screens).
+  var layout = document.querySelector(".layout");
+  var toggleBtn = document.getElementById("toggle-filters");
+  var toggleLabel = document.getElementById("toggle-filters-label");
+  function setFilters(open) {
+    if (!layout) return;
+    layout.classList.toggle("filters-collapsed", !open);
+    if (toggleBtn) toggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (toggleLabel) toggleLabel.textContent = open ? "Hide filters" : "Show filters";
   }
-  var cutoff = soonCutoff();
+  setFilters(!(window.matchMedia && window.matchMedia("(max-width: 899px)").matches));
+  if (toggleBtn) {
+    toggleBtn.addEventListener("click", function () {
+      setFilters(layout.classList.contains("filters-collapsed"));
+    });
+  }
 
-  function inBand(level, band) {
+  function titleOf(r) {
+    var t = r.querySelector(".row-title");
+    return t ? t.textContent.toLowerCase() : "";
+  }
+
+  function ordered() {
+    var mode = sortSel ? sortSel.value : "default";
+    var arr = rows.slice();
+    if (mode === "level-desc") {
+      arr.sort(function (a, b) {
+        return (parseInt(b.getAttribute("data-level"), 10) || 0) -
+               (parseInt(a.getAttribute("data-level"), 10) || 0);
+      });
+    } else if (mode === "az") {
+      arr.sort(function (a, b) { return titleOf(a) < titleOf(b) ? -1 : titleOf(a) > titleOf(b) ? 1 : 0; });
+    } else {
+      arr.sort(function (a, b) {
+        return (parseInt(a.getAttribute("data-idx"), 10) || 0) -
+               (parseInt(b.getAttribute("data-idx"), 10) || 0);
+      });
+    }
+    return arr;
+  }
+
+  function salaryOk(row, band) {
     if (!band) return true;
-    if (!level) return false;
-    var n = parseInt(level, 10);
-    if (band === "1-4") return n >= 1 && n <= 4;
-    if (band === "5-8") return n >= 5 && n <= 8;
-    if (band === "9-12") return n >= 9 && n <= 12;
-    if (band === "13-16") return n >= 13;
+    var v = parseInt(row.getAttribute("data-salary"), 10);
+    if (!v) return false;
+    var parts = band.split("-");
+    var lo = parseInt(parts[0], 10) || 0;
+    var hi = parts[1] ? parseInt(parts[1], 10) : Infinity;
+    return v >= lo && v < hi;
+  }
+
+  function passes(row) {
+    var term = (q && q.value ? q.value : "").trim().toLowerCase();
+    if (term && row.getAttribute("data-search").indexOf(term) === -1) return false;
+    if (fDept && fDept.value && row.getAttribute("data-department") !== fDept.value) return false;
+    if (fCat && fCat.value && row.getAttribute("data-category") !== fCat.value) return false;
+    if (fProv && fProv.value && row.getAttribute("data-province") !== fProv.value) return false;
+    if (fSalary && !salaryOk(row, fSalary.value)) return false;
+    if (fSoon && fSoon.checked) {
+      var cl = row.getAttribute("data-closing");
+      if (!cl || cl < today || (soonCutoff && cl > soonCutoff)) return false;
+    }
     return true;
   }
 
-  function apply() {
-    var term = (q && q.value ? q.value : "").trim().toLowerCase();
-    var prov = fProvince ? fProvince.value : "";
-    var cat = fCategory ? fCategory.value : "";
-    var band = fLevel ? fLevel.value : "";
-    var soon = fSoon ? fSoon.checked : false;
-    var shown = 0;
+  function recompute() {
+    matched = ordered().filter(passes);
+    // reflect order in the DOM so the visible page is in sorted order
+    for (var i = 0; i < matched.length; i++) list.appendChild(matched[i]);
+  }
 
-    for (var i = 0; i < cards.length; i++) {
-      var c = cards[i];
-      var ok = true;
-      if (term && c.getAttribute("data-search").indexOf(term) === -1) ok = false;
-      if (ok && prov && c.getAttribute("data-province") !== prov) ok = false;
-      if (ok && cat && c.getAttribute("data-category") !== cat) ok = false;
-      if (ok && !inBand(c.getAttribute("data-level"), band)) ok = false;
-      if (ok && soon) {
-        var cl = c.getAttribute("data-closing");
-        if (!cl || cl < today || (cutoff && cl > cutoff)) ok = false;
-      }
-      c.hidden = !ok;
-      if (ok) shown++;
+  function renderPage() {
+    var pages = Math.max(1, Math.ceil(matched.length / PAGE_SIZE));
+    if (page > pages) page = pages;
+    var start = (page - 1) * PAGE_SIZE, end = start + PAGE_SIZE;
+    var inMatched = {};
+    for (var i = 0; i < matched.length; i++) inMatched[matched[i].getAttribute("data-idx")] = i;
+    for (var j = 0; j < rows.length; j++) {
+      var r = rows[j];
+      var pos = inMatched[r.getAttribute("data-idx")];
+      r.hidden = !(pos !== undefined && pos >= start && pos < end);
     }
-    if (count) count.textContent = shown + (shown === 1 ? " vacancy" : " vacancies");
-    if (empty) empty.hidden = shown !== 0;
+    if (countEl) countEl.innerHTML = "<strong>" + matched.length + "</strong> " + (matched.length === 1 ? "vacancy" : "vacancies");
+    if (emptyEl) emptyEl.hidden = matched.length !== 0;
+    renderPager(pages);
   }
 
-  function sortCards() {
-    if (!sortSel) return;
-    var mode = sortSel.value;
-    var arr = cards.slice();
-    arr.sort(function (a, b) {
-      if (mode === "closing") {
-        var ca = a.getAttribute("data-closing") || "9999-99-99";
-        var cb = b.getAttribute("data-closing") || "9999-99-99";
-        return ca < cb ? -1 : ca > cb ? 1 : 0;
-      }
-      if (mode === "level-desc") {
-        return (parseInt(b.getAttribute("data-level"), 10) || 0) -
-               (parseInt(a.getAttribute("data-level"), 10) || 0);
-      }
-      return (parseInt(a.getAttribute("data-idx"), 10) || 0) -
-             (parseInt(b.getAttribute("data-idx"), 10) || 0);
-    });
-    for (var i = 0; i < arr.length; i++) grid.appendChild(arr[i]);
+  function renderPager(pages) {
+    if (!pager) return;
+    if (pages <= 1) { pager.hidden = true; pager.innerHTML = ""; return; }
+    pager.hidden = false;
+    pager.innerHTML = "";
+    var prev = document.createElement("button");
+    prev.type = "button"; prev.textContent = "‹ Previous"; prev.disabled = page <= 1;
+    prev.addEventListener("click", function () { if (page > 1) { page--; renderPage(); scrollTop(); } });
+    var info = document.createElement("span");
+    info.className = "page-info"; info.textContent = "Page " + page + " of " + pages;
+    var next = document.createElement("button");
+    next.type = "button"; next.textContent = "Next ›"; next.disabled = page >= pages;
+    next.addEventListener("click", function () { if (page < pages) { page++; renderPage(); scrollTop(); } });
+    pager.appendChild(prev); pager.appendChild(info); pager.appendChild(next);
   }
+
+  function scrollTop() {
+    var head = document.querySelector(".results-head");
+    if (head) head.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function apply() { page = 1; recompute(); renderPage(); }
 
   var timer;
-  function debounced() { clearTimeout(timer); timer = setTimeout(apply, 120); }
-
-  if (q) q.addEventListener("input", debounced);
-  [fProvince, fCategory, fLevel, fSoon].forEach(function (el) {
-    if (el) el.addEventListener("change", apply);
-  });
-  if (sortSel) sortSel.addEventListener("change", function () { sortCards(); apply(); });
+  if (q) q.addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(apply, 130); });
+  [fDept, fCat, fProv, fSalary, fSoon].forEach(function (el) { if (el) el.addEventListener("change", apply); });
+  if (sortSel) sortSel.addEventListener("change", apply);
   if (reset) reset.addEventListener("click", function () {
     if (q) q.value = "";
-    [fProvince, fCategory, fLevel].forEach(function (el) { if (el) el.value = ""; });
+    [fDept, fCat, fProv, fSalary].forEach(function (el) { if (el) el.value = ""; });
     if (fSoon) fSoon.checked = false;
     if (sortSel) sortSel.value = "default";
-    sortCards();
     apply();
   });
 

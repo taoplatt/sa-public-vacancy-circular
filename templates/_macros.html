@@ -1,4 +1,4 @@
-{# Reusable fragments: a vacancy card and the filter controls. #}
+{# Reusable fragments: a vacancy list-row and the filter sidebar. #}
 
 {% macro rand(n) -%}
 R{{ "{:,.0f}".format(n).replace(",", " ") }}
@@ -10,69 +10,91 @@ R{{ "{:,.0f}".format(n).replace(",", " ") }}
 {%- else %}Salary per advert{% endif %}
 {%- endmacro %}
 
-{% macro job_card(job, job_url, idx, today, soon_cutoff) -%}
+{% macro job_row(job, job_url, idx, today, soon_cutoff) -%}
 {% set closed = job.closing_date and today and job.closing_date < today %}
-{% set soon = job.closing_date and today and not closed and job.closing_date <= soon_cutoff %}
-<article class="card"
+<li class="job-row"
   data-idx="{{ idx }}"
+  data-department="{{ job.department | e }}"
   data-province="{{ job.province }}"
   data-category="{{ job.category }}"
   data-level="{{ job.salary_level or '' }}"
+  data-salary="{{ job.salary_min or '' }}"
   data-closing="{{ job.closing_date or '' }}"
-  data-posts="{{ job.number_of_posts }}"
   data-search="{{ (job.title ~ ' ' ~ job.department ~ ' ' ~ (job.city or '') ~ ' ' ~ job.reference_number ~ ' ' ~ job.category ~ ' ' ~ job.province) | lower | e }}">
-  <p class="cat">{{ job.category }}</p>
-  <h3><a href="{{ job_url }}">{{ job.title }}</a></h3>
-  <p class="dept">{{ job.department }}</p>
-  <div class="chips">
-    {% if job.salary_level %}<span class="chip level">Level {{ job.salary_level }}</span>{% endif %}
-    {% if job.number_of_posts > 1 %}<span class="chip posts">{{ job.number_of_posts }} posts</span>{% endif %}
-    {% if closed %}<span class="chip closed">Closed</span>
-    {% elif soon %}<span class="chip soon">Closes soon</span>{% endif %}
-  </div>
-  <div class="meta">
-    <span>{{ job.city or job.province }}</span>
-    <span>{% if job.closing_date_text %}Closes {{ job.closing_date_text }}{% else %}See advert{% endif %}</span>
-    <span>{{ salary_line(job) }}</span>
-  </div>
-</article>
+  <a class="row-link" href="{{ job_url }}">
+    <h3 class="row-title">{{ job.title }}</h3>
+    <p class="row-dept">{{ job.department }}</p>
+    <div class="row-tags">
+      <span class="tag">{{ job.city or job.province }}</span>
+      {% if job.salary_level %}<span class="tag">Level {{ job.salary_level }}</span>{% endif %}
+      {% if job.number_of_posts > 1 %}<span class="tag posts">{{ job.number_of_posts }} posts</span>{% endif %}
+      <span class="tag salary">{{ salary_line(job) }}</span>
+      {% if closed %}<span class="tag closed">Closed</span>
+      {% else %}<span class="tag">Closes {{ job.closing_date_text or 'see advert' }}</span>{% endif %}
+    </div>
+  </a>
+</li>
 {%- endmacro %}
 
-{% macro controls(provinces, categories) -%}
-<form class="controls" role="search" aria-label="Filter vacancies" onsubmit="return false">
-  <div class="wrap">
-    <div class="search-row">
-      <input type="search" id="q" name="q" placeholder="Search job title, department, town, reference…"
-             aria-label="Search vacancies" autocomplete="off">
+{% macro filter_sidebar(departments, provinces, categories) -%}
+<aside class="filters" id="filters-panel" aria-label="Filter vacancies">
+  <form class="filters-inner" role="search" onsubmit="return false">
+    <div class="field search">
+      <label class="visually-hidden" for="q">Search vacancies</label>
+      <input class="control" type="search" id="q" name="q"
+             placeholder="Search job title, town, reference…" autocomplete="off">
     </div>
-    <div class="filter-row">
-      <select id="f-province" aria-label="Province">
-        <option value="">All provinces</option>
-        {% for p in provinces %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
-      </select>
-      <select id="f-category" aria-label="Sector">
-        <option value="">All sectors</option>
-        {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
-      </select>
-      <select id="f-level" aria-label="Salary level">
-        <option value="">Any level</option>
-        <option value="1-4">Level 1–4</option>
-        <option value="5-8">Level 5–8</option>
-        <option value="9-12">Level 9–12</option>
-        <option value="13-16">Level 13+ (senior)</option>
-      </select>
-      <select id="sort" aria-label="Sort by">
-        <option value="default">Sort: default</option>
-        <option value="closing">Closing soonest</option>
-        <option value="level-desc">Highest level</option>
-      </select>
-      <label class="toggle"><input type="checkbox" id="f-soon"> Closing within 14 days</label>
+
+    <details open>
+      <summary>Department &amp; sector</summary>
+      <div class="field">
+        <label class="visually-hidden" for="f-department">Filter by department</label>
+        <select class="control" id="f-department">
+          <option value="">All departments</option>
+          {% for d in departments %}<option value="{{ d }}">{{ d }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label class="visually-hidden" for="f-category">Filter by sector</label>
+        <select class="control" id="f-category">
+          <option value="">All sectors</option>
+          {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+        </select>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Location</summary>
+      <div class="field">
+        <label class="visually-hidden" for="f-province">Filter by province</label>
+        <select class="control" id="f-province">
+          <option value="">All provinces</option>
+          {% for p in provinces %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+        </select>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Salary &amp; closing</summary>
+      <div class="field">
+        <label class="visually-hidden" for="f-salary">Filter by salary</label>
+        <select class="control" id="f-salary">
+          <option value="">Any salary</option>
+          <option value="0-200000">Under R200 000 a year</option>
+          <option value="200000-350000">R200 000 – R350 000 a year</option>
+          <option value="350000-500000">R350 000 – R500 000 a year</option>
+          <option value="500000-">R500 000 and above</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="toggle"><input type="checkbox" id="f-soon"> Closing within 14 days</label>
+      </div>
+    </details>
+
+    <div class="filters-foot">
+      <button type="button" class="btn-reset" id="reset">Reset all</button>
     </div>
-    <div class="result-line">
-      <span id="result-count" aria-live="polite">{{ total }} vacancies</span>
-      <button type="button" class="btn-reset" id="reset">Reset filters</button>
-    </div>
-    <noscript><p class="no-js-note">Filters need JavaScript. All vacancies are listed below; use your browser's find (Ctrl/⌘-F) to search.</p></noscript>
-  </div>
-</form>
+    <noscript><p class="no-js-note">Filters need JavaScript. Every vacancy is listed; use your browser's find (Ctrl/⌘-F).</p></noscript>
+  </form>
+</aside>
 {%- endmacro %}

@@ -141,6 +141,8 @@ def parse_title(title_line: str) -> Tuple[str, str, int]:
     title = re.split(r"\bREF\s*NO\b", line, flags=re.IGNORECASE)[0]
     title = re.sub(r"\(\s*X?\s*\d+\s*POSTS?\)", "", title, flags=re.IGNORECASE)
     title = title.strip(" :-").strip()
+    # safety net: strip a dangling "REF"/"REF NO" left when it wrapped oddly
+    title = re.sub(r"[\s,;:-]+REF(\s+NO)?\.?$", "", title, flags=re.IGNORECASE).strip()
     if not title:
         title = line
     return smart_titlecase(title), ref, posts
@@ -169,35 +171,51 @@ def parse_salary(text: str) -> Tuple[Optional[int], Optional[int], Optional[int]
 
 # Words that mean "this is not a town name" when they show up in a centre value.
 _NOT_A_CITY = re.compile(
-    r"government|department|provincial|national|head office|office of|directorate|"
-    r"various|to be|tbc|nationwide|region",
+    r"government|department|provincial|national|\boffice\b|directorate|"
+    r"various|to be|tbc|nationwide|region|centre$|headquarters",
     re.IGNORECASE,
 )
 
 
 def _clean_city(text: str) -> Optional[str]:
-    text = text.strip(" .,;:-")
-    if not text:
+    # drop any parenthetical aside, matched or dangling
+    text = re.sub(r"\s*\([^)]*\)?", "", text)
+    text = text.strip(" .,;:-()")
+    if not text or ":" in text:
         return None
     if _NOT_A_CITY.search(text):
         return None
-    if text.lower() in {p.lower() for p in _CANONICAL_PROVINCES}:
+    # reject province names (a city isn't a province) and multi-province blobs,
+    # comparing on letters only so "KwaZulu Natal" == "KwaZulu-Natal"
+    low_alnum = re.sub(r"[^a-z]", "", text.lower())
+    if any(re.sub(r"[^a-z]", "", p.lower()) in low_alnum for p in _CANONICAL_PROVINCES):
         return None
     return text[:60]
+
+
+def _looks_like_ref(text: str) -> bool:
+    return "/" in text or (bool(re.search(r"\d", text)) and len(text) > 24)
 
 
 def parse_centre(centre: str, province: str) -> Optional[str]:
     centre = re.sub(r"\s+", " ", centre).strip()
     if not centre:
         return None
+    # Multi-post CENTRE blocks pack several "… Ref No: XXX (X1 Post)" entries;
+    # keep only the first location, before any ref/post-count marker.
+    centre = re.split(r"\bref\s*no\b|\(\s*x?\s*\d+\s*post", centre, maxsplit=1, flags=re.IGNORECASE)[0]
+    centre = centre.strip(" :,-")
+    if not centre:
+        return None
     # common shapes: "Gauteng: Pretoria", "North West, Mafikeng", "Pretoria"
     for sep in (":", ",", "-"):
         if sep in centre:
             city = _clean_city(centre.split(sep)[-1])
-            if city:
+            if city and not _looks_like_ref(city):
                 return city
             break
-    return _clean_city(centre)
+    city = _clean_city(centre)
+    return city if city and not _looks_like_ref(city) else None
 
 
 def parse_closing_date(text: str) -> Tuple[str, Optional[str]]:
@@ -247,8 +265,31 @@ def parse_post(block: dict) -> Job:
     province = normalize_province(block.get("province", "National"))
     department = _titlecase_department(block.get("department", "") or "")
 
-    title, ref, posts = parse_title(block.get("title_line", ""))
-    meta = " ".join(block.get("meta_lines", []))
+    title_line = block.get("title_line", "")
+    metas = list(block.get("meta_lines", []))
+    # "REF NO:" often wraps: the POST line ends with "…REF" or "…REF NO:" and the
+    # reference number itself lands on the next line (e.g. "DBE/51/2026"). Detect
+    # that, strip the dangling label from the title, and take the ref from meta.
+    ref_from_meta = None
+    posts_from_meta = None
+    if metas and re.search(r"\bREF(\s+NO)?[:.]?\s*$", title_line, re.IGNORECASE):
+        tail = metas.pop(0)
+        mp = re.search(r"\(\s*X?\s*(\d+)\s*POSTS?\)", tail, re.IGNORECASE)
+        if mp:
+            posts_from_meta = int(mp.group(1))
+        ref_from_meta = re.sub(r"\(\s*X?\s*\d+\s*POSTS?\)", "", tail, flags=re.IGNORECASE).strip().rstrip(".")
+        title_line = re.sub(r"[\s,;:-]+REF(\s+NO)?[:.]?\s*$", "", title_line, flags=re.IGNORECASE).strip()
+
+    title, ref, posts = parse_title(title_line)
+    if not ref and ref_from_meta:
+        ref = ref_from_meta
+    if posts_from_meta:
+        posts = posts_from_meta
+    meta = " ".join(metas)
+    if not ref:
+        m = re.search(r"\bREF\s*NO[:.]?\s*(.+?)(?:\s*\(|$)", meta, re.IGNORECASE)
+        if m:
+            ref = m.group(1).strip().rstrip(".")
     salary_text = (fields.get("SALARY") or fields.get("STIPEND") or "").strip()
     level, smin, smax = parse_salary(salary_text)
     centre = fields.get("CENTRE", "").strip()

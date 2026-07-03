@@ -38,6 +38,21 @@ _FAVICON_SVG = (
 FAVICON = quote(_FAVICON_SVG, safe="")
 
 
+_MONTH_NAMES = ["", "January", "February", "March", "April", "May", "June",
+                "July", "August", "September", "October", "November", "December"]
+
+
+def _human_date(iso: str) -> str:
+    """'2026-07-03' -> '3 July 2026'. Returns '' on anything unparseable."""
+    if not iso:
+        return ""
+    try:
+        y, m, d = (int(x) for x in iso.split("-")[:3])
+        return "%d %s %d" % (d, _MONTH_NAMES[m], y)
+    except (ValueError, IndexError):
+        return ""
+
+
 def _sentence_items(text: str, min_words: int = 2) -> List[str]:
     """Split run-on requirement/duty prose into readable bullet items."""
     text = re.sub(r"\s+", " ", text or "").strip()
@@ -112,7 +127,7 @@ def build_site(circulars: List[Circular], out_dir: str = "site") -> None:
         jobs = _sorted_jobs(circ, today)
         provinces = _present((j.province for j in jobs), PROVINCES)
         categories = _present((j.category for j in jobs), CATEGORIES)
-        depts = {j.department for j in jobs if j.department}
+        departments = sorted({j.department for j in jobs if j.department})
         is_latest = circ.slug == latest.slug
         return listing_tpl.render(
             root=root,
@@ -121,22 +136,18 @@ def build_site(circulars: List[Circular], out_dir: str = "site") -> None:
             circular=circ,
             jobs=jobs,
             job_prefix=job_prefix,
+            departments=departments,
             provinces=provinces,
             categories=categories,
             total=len(jobs),
-            dept_count=len(depts),
+            dept_count=len(departments),
             prov_count=len(provinces),
             today=today,
             soon_cutoff=soon_cutoff,
+            issued_human=_human_date(circ.date_issued or ""),
             page_title=("Public Service Vacancies" if is_latest
                         else "%s · Public Service Vacancies" % circ.label),
-            heading=("This week's public service vacancies" if is_latest
-                     else circ.label),
-            lead=("Every advertised government post from the latest DPSA circular, "
-                  "searchable and filterable. Apply directly to the department named "
-                  "in each advert." if is_latest else
-                  "Vacancies from %s. Most closing dates have passed; kept for reference."
-                  % circ.label),
+            heading="Public service vacancies" if is_latest else circ.label,
         )
 
     def render_job(circ: Circular, job: Job, *, back_url: str, back_label: str) -> str:
@@ -150,6 +161,8 @@ def build_site(circulars: List[Circular], out_dir: str = "site") -> None:
             duty_items=_sentence_items(job.duties),
             back_url=back_url,
             back_label=back_label,
+            today=today,
+            soon_cutoff=soon_cutoff,
         )
 
     # Landing page = latest circular listing.
@@ -161,7 +174,7 @@ def build_site(circulars: List[Circular], out_dir: str = "site") -> None:
         _write(out_dir, "circular/%s.html" % circ.slug,
                render_listing(circ, root="../", job_prefix="../jobs/%s/" % circ.slug))
         back_url = "../../circular/%s.html" % circ.slug
-        back_label = "All %s vacancies" % circ.label
+        back_label = "Back to %s" % circ.label
         for job in circ.jobs:
             _write(out_dir, "jobs/%s/%s.html" % (circ.slug, job.slug),
                    render_job(circ, job, back_url=back_url, back_label=back_label))

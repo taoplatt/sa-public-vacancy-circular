@@ -5,15 +5,15 @@
 {% block content %}
 <main id="main">
   <div class="wrap prose">
-    <p class="eyebrow">Archive</p>
+    <p class="kicker-eyebrow">Archive</p>
     <h1>Past circulars</h1>
     <p class="muted">Every weekly circular we have processed, newest first. Older adverts have almost certainly closed; they are kept for reference.</p>
     <ul class="archive-list">
       {% for c in circulars %}
-      <li>
-        <a href="circular/{{ c.slug }}.html">{{ c.label }}</a>
+      <li><a href="circular/{{ c.slug }}.html">
+        <span class="a-title">{{ c.label }}</span>
         <span class="when">{% if c.date_issued %}issued {{ c.date_issued }} &middot; {% endif %}{{ c.jobs | length }} vacancies</span>
-      </li>
+      </a></li>
       {% endfor %}
     </ul>
   </div>
