@@ -1,18 +1,18 @@
 {% extends "base.html" %}
-{% block title %}Archive &middot; Public Service Vacancies{% endblock %}
-{% block description %}Browse past weekly Public Service Vacancy Circulars.{% endblock %}
+{% block title %}{{ t.title_archive }}{% endblock %}
+{% block description %}{{ t.archive_description }}{% endblock %}
 
 {% block content %}
 <main id="main">
   <div class="wrap prose">
-    <p class="kicker-eyebrow">Archive</p>
-    <h1>Past circulars</h1>
-    <p class="muted">Every weekly circular we have processed, newest first. Older adverts have almost certainly closed; they are kept for reference.</p>
+    <p class="kicker-eyebrow">{{ t.archive_eyebrow }}</p>
+    <h1>{{ t.archive_heading }}</h1>
+    <p class="muted">{{ t.archive_intro }}</p>
     <ul class="archive-list">
       {% for c in circulars %}
       <li><a href="circular/{{ c.slug }}.html">
         <span class="a-title">{{ c.label }}</span>
-        <span class="when">{% if c.date_issued %}issued {{ c.date_issued }} &middot; {% endif %}{{ c.jobs | length }} vacancies</span>
+        <span class="when">{% if c.date_issued %}{{ t.issued }} {{ c.date_issued }} &middot; {% endif %}{{ c.jobs | length }} {{ t.vacancies_word }}</span>
       </a></li>
       {% endfor %}
     </ul>

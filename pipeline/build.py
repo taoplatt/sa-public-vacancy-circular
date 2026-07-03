@@ -1,7 +1,14 @@
 """Render the static site from one or more Circular records.
 
-Output layout (relative links throughout, so it works at any base path,
-including a GitHub Pages project subpath):
+The site is rendered once per language into a self-contained tree: English at
+the site root, and each other language under ``site/<lang>/`` with its own copy
+of ``static/``. Because every tree is self-contained, the ``root`` relative-link
+scheme (``""`` / ``"../"`` / ``"../../"``) works unchanged inside each one, and
+the only cross-tree links are the language switcher, whose hrefs are computed
+per page (see ``_alternates``). No absolute paths, so the site still works under
+any base path (e.g. a GitHub Pages project subpath).
+
+Output layout (English tree shown; each of af/zu/xh mirrors it under its code):
 
     site/
       index.html                 latest circular (search + filter + cards)
@@ -9,22 +16,30 @@ including a GitHub Pages project subpath):
       jobs/<n>-<year>/<slug>.html  one detail page per post
       archive.html  about.html  404.html
       static/style.css  static/filter.js
+      af/  zu/  xh/               same tree, translated
 """
 from __future__ import annotations
 
 import datetime
+import json
 import os
 import re
 import shutil
-from typing import List
+from typing import Dict, List
 from urllib.parse import quote
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from .schema import CATEGORIES, PROVINCES, Circular, Job
 
-TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
-STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+_ROOT = os.path.dirname(os.path.dirname(__file__))
+TEMPLATES_DIR = os.path.join(_ROOT, "templates")
+STATIC_DIR = os.path.join(_ROOT, "static")
+I18N_DIR = os.path.join(_ROOT, "i18n")
+
+# English at the site root; each other language in its own subtree.
+LANGUAGES = ["en", "af", "zu", "xh"]
+HTML_LANG = {"en": "en-ZA", "af": "af-ZA", "zu": "zu-ZA", "xh": "xh-ZA"}
 
 # Small inline favicon: green tile + cream briefcase, URL-encoded for a data: URI.
 _FAVICON_SVG = (
@@ -38,17 +53,13 @@ _FAVICON_SVG = (
 FAVICON = quote(_FAVICON_SVG, safe="")
 
 
-_MONTH_NAMES = ["", "January", "February", "March", "April", "May", "June",
-                "July", "August", "September", "October", "November", "December"]
-
-
-def _human_date(iso: str) -> str:
-    """'2026-07-03' -> '3 July 2026'. Returns '' on anything unparseable."""
+def _human_date(iso: str, month_names: List[str]) -> str:
+    """'2026-07-03' -> '3 July 2026' (localised months). '' on anything bad."""
     if not iso:
         return ""
     try:
         y, m, d = (int(x) for x in iso.split("-")[:3])
-        return "%d %s %d" % (d, _MONTH_NAMES[m], y)
+        return "%d %s %d" % (d, month_names[m - 1], y)
     except (ValueError, IndexError):
         return ""
 
@@ -81,6 +92,61 @@ def _env() -> Environment:
     )
 
 
+# ---------------------------------------------------------------------------
+# i18n helpers
+# ---------------------------------------------------------------------------
+def _read_catalog_file(lang: str) -> dict:
+    path = os.path.join(I18N_DIR, "%s.json" % lang)
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def _load_catalog(lang: str) -> dict:
+    """English catalog overlaid with ``lang`` so any missing key falls back to
+    English. Language endonyms (``lang_names``) are always the canonical set."""
+    en = _read_catalog_file("en")
+    if lang == "en":
+        cat = dict(en)
+    else:
+        cat = dict(en)
+        cat.update(_read_catalog_file(lang))
+    cat["lang_names"] = en.get("lang_names", {})  # endonyms never translated
+    return cat
+
+
+def _job_view(job: Job, lang: str) -> Dict[str, str]:
+    """Resolve the four translatable fields, falling back to English per field."""
+    tr = None if lang == "en" else job.translations.get(lang)
+
+    def pick(field: str) -> str:
+        val = getattr(tr, field, None) if tr else None
+        return val if val else (getattr(job, field) or "")
+
+    return {
+        "title": pick("title"),
+        "summary": pick("summary"),
+        "requirements": pick("requirements"),
+        "duties": pick("duties"),
+    }
+
+
+def _alternates(lang: str, root: str, base_rel: str):
+    """Relative hrefs to the same page in every language.
+
+    English pages sit one directory shallower than af/zu/xh pages, so the walk
+    back to the true site root is ``root`` for English and ``root + '../'``
+    otherwise. Everything stays relative -> the site remains relocatable.
+    """
+    back = root if lang == "en" else root + "../"
+    return [(code, back + ("" if code == "en" else code + "/") + base_rel)
+            for code in LANGUAGES]
+
+
+# ---------------------------------------------------------------------------
+# rendering helpers
+# ---------------------------------------------------------------------------
 def _sorted_jobs(circ: Circular, today: str) -> List[Job]:
     def key(j: Job):
         closed = 1 if (j.closing_date and j.closing_date < today) else 0
@@ -108,6 +174,17 @@ def _write(out_dir: str, rel_path: str, html: str) -> None:
         fh.write(html)
 
 
+def _detail_disclaimer(t: dict, job: Job, circ: Circular) -> str:
+    dd = t["dd_lead"].format(post=job.post_number, label=circ.label)
+    dd += " " + t["dd_apply"].format(department=job.department)
+    if job.closing_date_text:
+        dd += t["dd_by"].format(closing=job.closing_date_text)
+    if job.reference_number:
+        dd += t["dd_ref"].format(reference=job.reference_number)
+    dd += t["dd_tail"]
+    return dd
+
+
 def build_site(circulars: List[Circular], out_dir: str = "site") -> None:
     if not circulars:
         raise ValueError("build_site needs at least one circular")
@@ -118,78 +195,101 @@ def build_site(circulars: List[Circular], out_dir: str = "site") -> None:
     latest = circulars[0]
 
     os.makedirs(out_dir, exist_ok=True)
+    for lang in LANGUAGES:
+        tree_dir = out_dir if lang == "en" else os.path.join(out_dir, lang)
+        _build_tree(env, circulars, latest, tree_dir, lang,
+                    _load_catalog(lang), today, soon_cutoff)
+
+    total_jobs = sum(len(c.jobs) for c in circulars)
+    pages_per_lang = 2 + len(circulars) * 2 + total_jobs
+    print("[build] %d languages · %d pages · %d circular(s) · %d jobs" % (
+        len(LANGUAGES), pages_per_lang * len(LANGUAGES), len(circulars), total_jobs))
+
+
+def _build_tree(env, circulars, latest, out_dir, lang, t, today, soon_cutoff):
+    os.makedirs(out_dir, exist_ok=True)
     _copy_static(out_dir)
+    html_lang = HTML_LANG.get(lang, "en-ZA")
+    month_names = t["month_names"]
 
     listing_tpl = env.get_template("listing.html")
     job_tpl = env.get_template("job.html")
 
-    def render_listing(circ: Circular, *, root: str, job_prefix: str) -> str:
+    def base_ctx(root, base_rel, nav):
+        alternates = _alternates(lang, root, base_rel)
+        en_href = next(href for code, href in alternates if code == "en")
+        return dict(root=root, nav=nav, favicon=FAVICON, t=t, lang=lang,
+                    html_lang=html_lang, alternates=alternates, en_href=en_href)
+
+    def render_listing(circ, *, root, job_prefix, base_rel):
         jobs = _sorted_jobs(circ, today)
+        job_views = [_job_view(j, lang) for j in jobs]
         provinces = _present((j.province for j in jobs), PROVINCES)
         categories = _present((j.category for j in jobs), CATEGORIES)
         departments = sorted({j.department for j in jobs if j.department})
         is_latest = circ.slug == latest.slug
+        page_title = (t["page_title_latest"] if is_latest
+                      else t["page_title_other"].format(label=circ.label))
+        heading = t["hero_heading"] if is_latest else circ.label
         return listing_tpl.render(
-            root=root,
-            nav="latest" if is_latest else "archive",
-            favicon=FAVICON,
             circular=circ,
             jobs=jobs,
+            job_views=job_views,
             job_prefix=job_prefix,
             departments=departments,
             provinces=provinces,
             categories=categories,
             total=len(jobs),
-            dept_count=len(departments),
-            prov_count=len(provinces),
             today=today,
             soon_cutoff=soon_cutoff,
-            issued_human=_human_date(circ.date_issued or ""),
-            page_title=("Public Service Vacancies" if is_latest
-                        else "%s · Public Service Vacancies" % circ.label),
-            heading="Public service vacancies" if is_latest else circ.label,
+            issued_human=_human_date(circ.date_issued or "", month_names),
+            page_title=page_title,
+            heading=heading,
+            listing_description=t["listing_description"].format(
+                total=len(jobs), label=circ.label),
+            **base_ctx(root, base_rel, "latest" if is_latest else "archive"),
         )
 
-    def render_job(circ: Circular, job: Job, *, back_url: str, back_label: str) -> str:
+    def render_job(circ, job, *, back_url, base_rel):
+        view = _job_view(job, lang)
+        nav = "latest" if circ.slug == latest.slug else "archive"
         return job_tpl.render(
-            root="../../",
-            nav="latest" if circ.slug == latest.slug else "archive",
-            favicon=FAVICON,
             circular=circ,
             job=job,
-            req_items=_sentence_items(job.requirements),
-            duty_items=_sentence_items(job.duties),
+            view=view,
+            req_items=_sentence_items(view["requirements"]),
+            duty_items=_sentence_items(view["duties"]),
             back_url=back_url,
-            back_label=back_label,
+            back_label=t["back_to"].format(label=circ.label),
+            disclaimer=_detail_disclaimer(t, job, circ),
             today=today,
             soon_cutoff=soon_cutoff,
+            **base_ctx("../../", base_rel, nav),
         )
 
     # Landing page = latest circular listing.
-    _write(out_dir, "index.html",
-           render_listing(latest, root="", job_prefix="jobs/%s/" % latest.slug))
+    _write(out_dir, "index.html", render_listing(
+        latest, root="", job_prefix="jobs/%s/" % latest.slug, base_rel="index.html"))
 
     # Per-circular listing pages + per-job detail pages.
     for circ in circulars:
-        _write(out_dir, "circular/%s.html" % circ.slug,
-               render_listing(circ, root="../", job_prefix="../jobs/%s/" % circ.slug))
+        _write(out_dir, "circular/%s.html" % circ.slug, render_listing(
+            circ, root="../", job_prefix="../jobs/%s/" % circ.slug,
+            base_rel="circular/%s.html" % circ.slug))
         back_url = "../../circular/%s.html" % circ.slug
-        back_label = "Back to %s" % circ.label
         for job in circ.jobs:
             _write(out_dir, "jobs/%s/%s.html" % (circ.slug, job.slug),
-                   render_job(circ, job, back_url=back_url, back_label=back_label))
+                   render_job(circ, job, back_url=back_url,
+                              base_rel="jobs/%s/%s.html" % (circ.slug, job.slug)))
 
     # Archive, about, 404.
     _write(out_dir, "archive.html", env.get_template("archive.html").render(
-        root="", nav="archive", favicon=FAVICON, circulars=circulars))
+        circulars=circulars, **base_ctx("", "archive.html", "archive")))
     _write(out_dir, "about.html", env.get_template("about.html").render(
-        root="", nav="about", favicon=FAVICON, generated_at=latest.generated_at))
+        generated_at=latest.generated_at, **base_ctx("", "about.html", "about")))
     _write(out_dir, "404.html", env.get_template("404.html").render(
-        root="", nav="", favicon=FAVICON))
+        **base_ctx("", "404.html", "")))
 
-    # A .nojekyll so GitHub Pages serves the folders as-is.
-    _write(out_dir, ".nojekyll", "")
-
-    total_jobs = sum(len(c.jobs) for c in circulars)
-    print("[build] %d pages · %d circular(s) · %d jobs" % (
-        2 + len(circulars) * 2 + total_jobs, len(circulars), total_jobs))
+    # A .nojekyll at the site root so GitHub Pages serves the folders as-is.
+    if lang == "en":
+        _write(out_dir, ".nojekyll", "")

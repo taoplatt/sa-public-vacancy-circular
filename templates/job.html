@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import salary_line %}
-{% block title %}{{ job.title }} &middot; {{ job.department }}{% endblock %}
-{% block description %}{{ job.summary or job.title }} Closing date {{ job.closing_date_text or 'per advert' }}. Reference {{ job.reference_number }}.{% endblock %}
+{% block title %}{{ view.title }} &middot; {{ job.department }}{% endblock %}
+{% block description %}{{ view.summary or view.title }} {{ t.meta_closing_date }} {{ job.closing_date_text or t.meta_per_advert }}. {{ t.meta_reference }} {{ job.reference_number }}.{% endblock %}
 
 {% set closed = job.closing_date and today and job.closing_date < today %}
 
@@ -12,70 +12,66 @@
 
     <div class="detail-grid">
       <div class="detail-main">
-        <p class="kicker">{{ job.category }} &middot; {{ circular.label }}</p>
-        <h1>{{ job.title }}</h1>
+        <p class="kicker">{{ t.category.get(job.category, job.category) }} &middot; {{ circular.label }}</p>
+        <h1>{{ view.title }}</h1>
         <p class="dept">{{ job.department }}</p>
 
-        {% if job.summary %}
-        <section><h2>Overview<span class="rule"></span></h2><p>{{ job.summary }}</p></section>
+        {% if view.summary %}
+        <section><h2>{{ t.overview }}<span class="rule"></span></h2><p>{{ view.summary }}</p></section>
         {% endif %}
 
         {% if req_items %}
-        <section><h2>Requirements<span class="rule"></span></h2><ul>{% for it in req_items %}<li>{{ it }}</li>{% endfor %}</ul></section>
-        {% elif job.requirements %}
-        <section><h2>Requirements<span class="rule"></span></h2><p>{{ job.requirements }}</p></section>
+        <section><h2>{{ t.requirements }}<span class="rule"></span></h2><ul>{% for it in req_items %}<li>{{ it }}</li>{% endfor %}</ul></section>
+        {% elif view.requirements %}
+        <section><h2>{{ t.requirements }}<span class="rule"></span></h2><p>{{ view.requirements }}</p></section>
         {% endif %}
 
         {% if duty_items %}
-        <section><h2>Duties<span class="rule"></span></h2><ul>{% for it in duty_items %}<li>{{ it }}</li>{% endfor %}</ul></section>
-        {% elif job.duties %}
-        <section><h2>Duties<span class="rule"></span></h2><p>{{ job.duties }}</p></section>
+        <section><h2>{{ t.duties }}<span class="rule"></span></h2><ul>{% for it in duty_items %}<li>{{ it }}</li>{% endfor %}</ul></section>
+        {% elif view.duties %}
+        <section><h2>{{ t.duties }}<span class="rule"></span></h2><p>{{ view.duties }}</p></section>
         {% endif %}
 
         {% if job.applications or job.enquiries %}
-        <section id="apply"><h2>How to apply<span class="rule"></span></h2>
+        <section id="apply"><h2>{{ t.how_to_apply }}<span class="rule"></span></h2>
           {% if job.applications %}<p>{{ job.applications }}</p>{% endif %}
-          {% if job.enquiries %}<p><strong>Enquiries:</strong> {{ job.enquiries }}</p>{% endif %}
+          {% if job.enquiries %}<p><strong>{{ t.enquiries_label }}:</strong> {{ job.enquiries }}</p>{% endif %}
         </section>
         {% endif %}
 
         {% if job.notes %}
-        <section><h2>Notes<span class="rule"></span></h2><p>{{ job.notes }}</p></section>
+        <section><h2>{{ t.notes }}<span class="rule"></span></h2><p>{{ job.notes }}</p></section>
         {% endif %}
 
-        <p class="disclaimer">
-          Post {{ job.post_number }}, sourced from the DPSA {{ circular.label }}.
-          Apply directly to {{ job.department }}{% if job.closing_date_text %} by {{ job.closing_date_text }}{% endif %}{% if job.reference_number %}, quoting reference {{ job.reference_number }}{% endif %}.
-          This is an unofficial index; the advert in the circular is authoritative.
-        </p>
+        <p class="disclaimer">{{ disclaimer }}</p>
       </div>
 
       <div class="side-panel">
         <div class="panel-card">
           <dl>
             <div>
-              <dt>Location</dt>
-              <dd>{{ job.city or job.province }}{% if job.city and job.province != 'National' %}, {{ job.province }}{% endif %}</dd>
+              <dt>{{ t.label_location }}</dt>
+              <dd>{{ job.city or t.province.get(job.province, job.province) }}{% if job.city and job.province != 'National' %}, {{ t.province.get(job.province, job.province) }}{% endif %}</dd>
             </div>
             <div>
-              <dt>Salary</dt>
-              <dd>{{ salary_line(job) }}{% if job.salary_level %} &middot; Level {{ job.salary_level }}{% endif %}</dd>
+              <dt>{{ t.label_salary }}</dt>
+              <dd>{{ salary_line(job, t) }}{% if job.salary_level %} &middot; {{ t.tag_level }} {{ job.salary_level }}{% endif %}</dd>
             </div>
             <div>
-              <dt>Closing date</dt>
-              <dd>{{ job.closing_date_text or 'See advert' }}
-                {% if closed %}<span class="tag closed">Closed</span>{% endif %}
+              <dt>{{ t.label_closing }}</dt>
+              <dd>{{ job.closing_date_text or t.closing_see_advert }}
+                {% if closed %}<span class="tag closed">{{ t.tag_closed }}</span>{% endif %}
               </dd>
             </div>
             <div>
-              <dt>Reference</dt>
-              <dd>{{ job.reference_number or '—' }}{% if job.number_of_posts > 1 %} &middot; {{ job.number_of_posts }} posts{% endif %}</dd>
+              <dt>{{ t.label_reference }}</dt>
+              <dd>{{ job.reference_number or '—' }}{% if job.number_of_posts > 1 %} &middot; {{ job.number_of_posts }} {{ t.tag_posts }}{% endif %}</dd>
             </div>
           </dl>
           {% if job.applications or job.enquiries %}
-          <a class="btn-apply" href="#apply">How to apply &rarr;</a>
+          <a class="btn-apply" href="#apply">{{ t.how_to_apply }} &rarr;</a>
           {% endif %}
-          <p class="apply-note">Apply directly to the department, by the closing date, quoting the reference.</p>
+          <p class="apply-note">{{ t.apply_note }}</p>
         </div>
       </div>
     </div>

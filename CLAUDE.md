@@ -9,7 +9,10 @@ Circular** (a 300+ page PDF, ~575 posts) into a fast, mobile-first,
 low-bandwidth job-search site with a browsable archive. See `README.md` for the
 user-facing overview.
 
-Data flow: `fetch → segment → parse → (enrich) → build → deploy`.
+Data flow: `fetch → segment → parse → (enrich) → (translate) → build → deploy`.
+
+The site is multilingual: English is canonical, and it is also rendered into
+Afrikaans (`af`), isiZulu (`zu`) and isiXhosa (`xh`) at build time.
 
 ## Commands
 
@@ -23,7 +26,10 @@ python run.py --pdf "PSV CIRCULAR 23 of 2026.pdf"   # process a local PDF
 python run.py                                        # fetch the newest circular from DPSA
 python run.py --enrich                               # + Claude Batch enrichment (needs API key)
 python run.py --enrich --sync-limit 5                # enrich 5 jobs synchronously (quick check)
-python run.py --build-only                           # re-render site/ from existing data/
+python run.py --enrich --translate                   # + translate job content to af/zu/xh (Batch)
+python run.py --translate --translate-limit 3        # translate 3 jobs synchronously (quick check)
+python run.py --translate-ui                          # regenerate i18n/<lang>.json chrome catalogs
+python run.py --build-only                           # re-render site/ (all languages) from existing data/
 
 # Preview
 python -m http.server -d site 8099                   # http://localhost:8099
@@ -46,8 +52,9 @@ The Anthropic SDK reads `ANTHROPIC_API_KEY` from the environment. Two places:
 - **CI:** repo **Settings → Secrets and variables → Actions → New repository
   secret**, named `ANTHROPIC_API_KEY`. The workflow already references it.
 
-Without a key, `pipeline/extract.py` skips enrichment and the site still builds
-fully from the deterministic parse.
+Without a key, `pipeline/extract.py` and `pipeline/translate.py` skip their work
+and the site still builds fully from the deterministic parse (in English; the
+other-language trees fall back to English content).
 
 ## Architecture
 
@@ -58,9 +65,11 @@ fully from the deterministic parse.
 | `pipeline/segment.py` | `pdftotext -layout` → one raw text block per post (+ inherited dept context) |
 | `pipeline/parse.py` | Raw block → complete `Job` (deterministic; no API call) |
 | `pipeline/extract.py` | Optional Claude Haiku 4.5 Batch enrichment, merged onto parsed jobs |
-| `pipeline/build.py` | Jinja2 → static `site/` (index, per-job, per-circular, archive, about, 404) |
+| `pipeline/translate.py` | Optional Claude Haiku 4.5 Batch translation (af/zu/xh) into `Job.translations`; also `--translate-ui` for the chrome catalogs |
+| `pipeline/build.py` | Jinja2 → static `site/`, once per language (en at root, `af`/`zu`/`xh` subtrees) |
 | `run.py` | Orchestrator + `.env` loader |
 | `templates/`, `static/` | Jinja2 templates; `style.css` + `filter.js` |
+| `i18n/` | Chrome message catalogs: `en.json` (hand-authored source) + `af`/`zu`/`xh` (generated, editable) |
 
 ## Conventions & gotchas
 
@@ -79,7 +88,28 @@ fully from the deterministic parse.
   (`/newsroom/psvc/circular-<n>-of-<year>/`); the combined PDF on that page is
   named like `PSV CIRCULAR 23 of 2026.pdf` (per-annexure splits are `a.pdf`…).
 - **Source of truth vs generated:** `data/circulars/*.json` is committed (the
-  archive). `site/` and `data/raw/` are git-ignored and regenerated.
+  archive). `site/` and `data/raw/` are git-ignored and regenerated. Job
+  translations live **inline** in those JSON files (under `Job.translations`).
+- **Multilingual gotchas:**
+  - **Filter machinery stays English on every language tree.** In
+    `templates/_macros.html`, all `data-*` attributes, `data-search`, and
+    `<option value>`s use the canonical English category/province/department
+    values, because `filter.js` does exact-string equality. Only the *display*
+    text is localised (via the `category`/`province` maps in the catalog). Never
+    translate a filter value or a `data-*` attribute.
+  - **Catalog fallback:** `build.py:_load_catalog` overlays `i18n/<lang>.json`
+    on `i18n/en.json`, so a missing key falls back to English — never a
+    `KeyError`. `en.json` is the source of truth; regenerate the others with
+    `--translate-ui` when you change it.
+  - **Bullet-punctuation coupling:** `build.py:_sentence_items` splits
+    `requirements`/`duties` into bullets on `.`/`;` boundaries. The translation
+    prompt (and the `translation_schema` field descriptions) instruct the model
+    to preserve sentence-ending punctuation; if a translation drops it, the
+    field degrades to a single paragraph (graceful, never an error).
+  - Each language is a **self-contained tree** with its own `static/` copy;
+    cross-tree links are only the language switcher, whose relative hrefs
+    `build.py:_alternates` computes per page (English sits one level shallower
+    than `af`/`zu`/`xh`). No absolute paths — the site stays relocatable.
 - **Design = Hillian system.** Green `#1E3A2B` / cream `#F4EEDF` / one sky accent
   `#8FBBD9`; Georgia serif everywhere (system font — do **not** add web fonts);
   sentence-case headings; British English; **no em dashes**, no emoji. Tokens
@@ -91,6 +121,7 @@ fully from the deterministic parse.
 ## Deploy
 
 `.github/workflows/update.yml` runs weekly (+ manual dispatch): fetch → enrich →
-commit new `data/circulars` JSON → deploy `site/` to GitHub Pages. Enable Pages
-(Settings → Pages → Source: GitHub Actions) and add the `ANTHROPIC_API_KEY`
-secret.
+translate → commit new `data/circulars` JSON (translations included inline) →
+deploy `site/` to GitHub Pages. Enable Pages (Settings → Pages → Source: GitHub
+Actions) and add the `ANTHROPIC_API_KEY` secret. The `i18n/` chrome catalogs are
+committed and regenerated manually with `--translate-ui`, not on every run.

@@ -79,10 +79,23 @@ a:focus-visible { background: #ffdd00; color: #0b0c0c; text-decoration: none; bo
 .brand-text { display: flex; flex-direction: column; line-height: 1.1; }
 .brand-name { font-size: 1.02rem; font-weight: 700; color: #fff; }
 .brand-sub { font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold-soft); }
+.brand { margin-right: auto; }
 .site-nav { display: flex; gap: 0.4rem; font-size: 0.88rem; }
 .site-nav a { color: #fff; text-decoration: none; opacity: 0.82; padding: 0.35rem 0.75rem; border-radius: var(--r-pill); transition: background var(--ease) .2s, opacity var(--ease) .2s; }
 .site-nav a:hover { opacity: 1; background: rgba(255, 255, 255, 0.10); }
 .site-nav a[aria-current="page"] { opacity: 1; background: rgba(230, 200, 119, 0.18); color: var(--gold-soft); }
+
+/* ---- Language switcher ---- */
+.lang-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0.1rem; font-size: 0.78rem; padding-left: 0.5rem; margin-left: 0.4rem; box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.16); }
+.lang-nav a, .lang-nav .lang-current { color: #fff; text-decoration: none; padding: 0.3rem 0.55rem; border-radius: var(--r-pill); white-space: nowrap; }
+.lang-nav a { opacity: 0.72; transition: background var(--ease) .2s, opacity var(--ease) .2s; }
+.lang-nav a:hover { opacity: 1; background: rgba(255, 255, 255, 0.10); }
+.lang-nav .lang-current { opacity: 1; background: rgba(230, 200, 119, 0.18); color: var(--gold-soft); font-weight: 600; }
+
+/* ---- Machine-translation notice (non-English pages) ---- */
+.mt-notice { background: var(--gold-14); border-bottom: 1px solid var(--gold-30); }
+.mt-notice p { margin: 0; padding: 0.5rem 0; font-size: 0.82rem; color: #5c4405; }
+.mt-notice a { color: var(--green); font-weight: 600; }
 
 /* ---- Hero ---- */
 .hero { background: var(--white); border-bottom: 1px solid var(--line); padding: 2.1rem 0 1.6rem; }

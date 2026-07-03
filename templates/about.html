@@ -1,18 +1,18 @@
 {% extends "base.html" %}
-{% block title %}About &middot; Public Service Vacancies{% endblock %}
-{% block description %}How this independent index of South African public-service vacancies works.{% endblock %}
+{% block title %}{{ t.title_about }}{% endblock %}
+{% block description %}{{ t.about_description }}{% endblock %}
 
 {% block content %}
 <main id="main">
   <div class="wrap prose">
-    <p class="kicker-eyebrow">About</p>
-    <h1>About this index</h1>
-    <p>Each week (except during December) the Department of Public Service and Administration publishes the Public Service Vacancy Circular: a single, long PDF listing every advertised post across national and provincial government. It is comprehensive, but hard to search, and heavy to open on a phone or a slow connection.</p>
-    <p>This site republishes those same vacancies in a lighter form. We read the latest circular, separate it into individual posts, and present each one as a page you can search, filter and open quickly. The pages are plain and static, so they load on modest connections and work even with JavaScript switched off.</p>
-    <h2>Please note</h2>
-    <p>This is an independent, unofficial index. We do not receive applications and we are not the employer. Every advert names the department to apply to, a closing date, and a reference number: apply directly to that department, by that date, quoting that reference. Where anything here differs from the official circular, the circular is correct.</p>
-    <p>The source is the DPSA newsroom: <a href="https://www.dpsa.gov.za/newsroom/psvc/">dpsa.gov.za/newsroom/psvc</a>.</p>
-    {% if generated_at %}<p class="muted">Last updated {{ generated_at }}.</p>{% endif %}
+    <p class="kicker-eyebrow">{{ t.about_eyebrow }}</p>
+    <h1>{{ t.about_heading }}</h1>
+    <p>{{ t.about_p1 }}</p>
+    <p>{{ t.about_p2 }}</p>
+    <h2>{{ t.about_please_note }}</h2>
+    <p>{{ t.about_p3 }}</p>
+    <p>{{ t.about_source_lead }} <a href="https://www.dpsa.gov.za/newsroom/psvc/">dpsa.gov.za/newsroom/psvc</a>.</p>
+    {% if generated_at %}<p class="muted">{{ t.last_updated.format(date=generated_at) }}</p>{% endif %}
   </div>
 </main>
 {% endblock %}

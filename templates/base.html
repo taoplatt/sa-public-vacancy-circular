@@ -1,16 +1,20 @@
 <!DOCTYPE html>
-<html lang="en-ZA">
+<html lang="{{ html_lang }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Public Service Vacancies{% endblock %}</title>
-  <meta name="description" content="{% block description %}A fast, searchable listing of South African public-service vacancies, drawn each week from the DPSA Public Service Vacancy Circular.{% endblock %}">
+  <title>{% block title %}{{ t.page_title_latest }}{% endblock %}</title>
+  <meta name="description" content="{% block description %}{{ t.meta_description }}{% endblock %}">
   <meta name="color-scheme" content="light">
   <link rel="stylesheet" href="{{ root }}static/style.css">
   <link rel="icon" href="data:image/svg+xml,{{ favicon }}">
+  {% for code, href in alternates %}
+  <link rel="alternate" hreflang="{{ code }}" href="{{ href }}">
+  {% endfor %}
+  <link rel="alternate" hreflang="x-default" href="{{ en_href }}">
 </head>
 <body class="{% block body_class %}{% endblock %}">
-  <a class="skip-link" href="#main">Skip to content</a>
+  <a class="skip-link" href="#main">{{ t.skip_to_content }}</a>
   <header class="site-header">
     <div class="wrap">
       <a class="brand" href="{{ root }}index.html">
@@ -21,24 +25,36 @@
           <path d="M3 12h18"></path>
         </svg>
         <span class="brand-text">
-          <span class="brand-name">Public Service Vacancies</span>
-          <span class="brand-sub">South Africa</span>
+          <span class="brand-name">{{ t.brand_name }}</span>
+          <span class="brand-sub">{{ t.brand_sub }}</span>
         </span>
       </a>
       <nav class="site-nav" aria-label="Primary">
-        <a href="{{ root }}index.html"{% if nav == 'latest' %} aria-current="page"{% endif %}>Latest</a>
-        <a href="{{ root }}archive.html"{% if nav == 'archive' %} aria-current="page"{% endif %}>Archive</a>
-        <a href="{{ root }}about.html"{% if nav == 'about' %} aria-current="page"{% endif %}>About</a>
+        <a href="{{ root }}index.html"{% if nav == 'latest' %} aria-current="page"{% endif %}>{{ t.nav_latest }}</a>
+        <a href="{{ root }}archive.html"{% if nav == 'archive' %} aria-current="page"{% endif %}>{{ t.nav_archive }}</a>
+        <a href="{{ root }}about.html"{% if nav == 'about' %} aria-current="page"{% endif %}>{{ t.nav_about }}</a>
+      </nav>
+      <nav class="lang-nav" aria-label="{{ t.lang_switcher_label }}">
+        {% for code, href in alternates %}
+        {% if code == lang %}<span class="lang-current" aria-current="true">{{ t.lang_names[code] }}</span>
+        {% else %}<a href="{{ href }}" hreflang="{{ code }}">{{ t.lang_names[code] }}</a>{% endif %}
+        {% endfor %}
       </nav>
     </div>
   </header>
+
+  {% if lang != 'en' %}
+  <div class="mt-notice">
+    <div class="wrap"><p>{{ t.mt_notice }} <a href="{{ en_href }}">{{ t.mt_notice_link }}</a></p></div>
+  </div>
+  {% endif %}
 
   {% block content %}{% endblock %}
 
   <footer class="site-footer">
     <div class="wrap">
-      <p>Vacancies are republished from the Department of Public Service and Administration (DPSA) Public Service Vacancy Circular. This is an independent, unofficial index.</p>
-      <p>Always apply to the department named in each advert, by its stated closing date. <a href="https://www.dpsa.gov.za/newsroom/psvc/">DPSA source &rarr;</a></p>
+      <p>{{ t.footer_disclaimer_1 }}</p>
+      <p>{{ t.footer_disclaimer_2 }} <a href="https://www.dpsa.gov.za/newsroom/psvc/">{{ t.footer_source_link }} &rarr;</a></p>
     </div>
   </footer>
 

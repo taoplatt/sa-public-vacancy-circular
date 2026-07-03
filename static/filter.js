@@ -6,6 +6,7 @@
   var list = document.getElementById("job-list");
   if (!list) return;
 
+  var I = window.__I18N__ || {};  // localized UI strings (English fallback)
   var PAGE_SIZE = 20;
   var rows = Array.prototype.slice.call(list.querySelectorAll(".job-row"));
   var today = list.getAttribute("data-today") || "";
@@ -34,7 +35,7 @@
     if (!layout) return;
     layout.classList.toggle("filters-collapsed", !open);
     if (toggleBtn) toggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
-    if (toggleLabel) toggleLabel.textContent = open ? "Hide filters" : "Show filters";
+    if (toggleLabel) toggleLabel.textContent = open ? (I.hideFilters || "Hide filters") : (I.showFilters || "Show filters");
   }
   setFilters(!(window.matchMedia && window.matchMedia("(max-width: 899px)").matches));
   if (toggleBtn) {
@@ -108,7 +109,7 @@
       var pos = inMatched[r.getAttribute("data-idx")];
       r.hidden = !(pos !== undefined && pos >= start && pos < end);
     }
-    if (countEl) countEl.innerHTML = "<strong>" + matched.length + "</strong> " + (matched.length === 1 ? "vacancy" : "vacancies");
+    if (countEl) countEl.innerHTML = "<strong>" + matched.length + "</strong> " + (matched.length === 1 ? (I.vacancy || "vacancy") : (I.vacancies || "vacancies"));
     if (emptyEl) emptyEl.hidden = matched.length !== 0;
     renderPager(pages);
   }
@@ -119,12 +120,13 @@
     pager.hidden = false;
     pager.innerHTML = "";
     var prev = document.createElement("button");
-    prev.type = "button"; prev.textContent = "‹ Previous"; prev.disabled = page <= 1;
+    prev.type = "button"; prev.textContent = I.prev || "‹ Previous"; prev.disabled = page <= 1;
     prev.addEventListener("click", function () { if (page > 1) { page--; renderPage(); scrollTop(); } });
     var info = document.createElement("span");
-    info.className = "page-info"; info.textContent = "Page " + page + " of " + pages;
+    info.className = "page-info";
+    info.textContent = (I.pageOf || "Page {page} of {pages}").replace("{page}", page).replace("{pages}", pages);
     var next = document.createElement("button");
-    next.type = "button"; next.textContent = "Next ›"; next.disabled = page >= pages;
+    next.type = "button"; next.textContent = I.next || "Next ›"; next.disabled = page >= pages;
     next.addEventListener("click", function () { if (page < pages) { page++; renderPage(); scrollTop(); } });
     pager.appendChild(prev); pager.appendChild(info); pager.appendChild(next);
   }

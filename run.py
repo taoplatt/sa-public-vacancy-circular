@@ -20,7 +20,7 @@ import datetime
 import glob
 import os
 
-from pipeline import build, extract, fetch, parse, segment
+from pipeline import build, extract, fetch, parse, segment, translate
 from pipeline.schema import Circular
 
 DATA_DIR = "data/circulars"
@@ -50,7 +50,14 @@ def _now_iso() -> str:
     return datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat()
 
 
-def process_pdf(pdf_path: str, enrich: bool = False, sync_limit: int = 0) -> Circular:
+def process_pdf(
+    pdf_path: str,
+    enrich: bool = False,
+    sync_limit: int = 0,
+    do_translate: bool = False,
+    translate_sync_limit: int = 0,
+    languages=None,
+) -> Circular:
     number, year, date_iso = fetch.circular_meta_from_pdf(pdf_path)
     print("[run] %s -> circular %s of %s (issued %s)" % (
         os.path.basename(pdf_path), number, year, date_iso or "?"))
@@ -63,6 +70,12 @@ def process_pdf(pdf_path: str, enrich: bool = False, sync_limit: int = 0) -> Cir
             extract.enrich_sync(jobs, limit=sync_limit)
         else:
             extract.enrich_jobs(jobs)
+
+    if do_translate:
+        if translate_sync_limit:
+            translate.translate_sync(jobs, languages=languages, limit=translate_sync_limit)
+        else:
+            translate.translate_jobs(jobs, languages=languages)
 
     circ = Circular(
         number=number or 0,
@@ -95,10 +108,24 @@ def main() -> None:
     ap.add_argument("--build-only", action="store_true", help="Only rebuild the site.")
     ap.add_argument("--enrich", action="store_true", help="Run LLM enrichment (needs key).")
     ap.add_argument("--sync-limit", type=int, default=0, help="Enrich N jobs synchronously.")
+    ap.add_argument("--translate", action="store_true",
+                    help="Translate job content to af/zu/xh via Batch (needs key).")
+    ap.add_argument("--translate-limit", type=int, default=0,
+                    help="Translate N jobs synchronously (quick check).")
+    ap.add_argument("--translate-languages", default="",
+                    help="Comma-separated language codes (default: af,zu,xh).")
+    ap.add_argument("--translate-ui", action="store_true",
+                    help="Regenerate i18n/<lang>.json chrome catalogs from en.json and exit.")
     ap.add_argument("--out", default="site", help="Output directory (default: site).")
     args = ap.parse_args()
 
     _load_dotenv()  # pick up ANTHROPIC_API_KEY from a local .env if present
+
+    if args.translate_ui:
+        translate.translate_ui_catalogs()
+        return
+
+    langs = [s.strip() for s in args.translate_languages.split(",") if s.strip()] or None
 
     if not args.build_only:
         pdf = args.pdf
@@ -106,7 +133,9 @@ def main() -> None:
             pdf = fetch.fetch_latest()
             if not pdf:
                 raise SystemExit("Could not fetch a circular. Pass --pdf <path>.")
-        process_pdf(pdf, enrich=args.enrich, sync_limit=args.sync_limit)
+        process_pdf(pdf, enrich=args.enrich, sync_limit=args.sync_limit,
+                    do_translate=args.translate, translate_sync_limit=args.translate_limit,
+                    languages=langs)
 
     circulars = load_all_circulars()
     if not circulars:

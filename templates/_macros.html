@@ -1,16 +1,19 @@
-{# Reusable fragments: a vacancy list-row and the filter sidebar. #}
+{# Reusable fragments: a vacancy list-row and the filter sidebar.
+   `t` is the language catalog. IMPORTANT: option values and every data-*
+   attribute stay in canonical English so filter.js (exact-string equality)
+   keeps working on every language tree; only display text is translated. #}
 
 {% macro rand(n) -%}
 R{{ "{:,.0f}".format(n).replace(",", " ") }}
 {%- endmacro %}
 
-{% macro salary_line(job) -%}
-{% if job.salary_min and job.salary_max %}{{ rand(job.salary_min) }} – {{ rand(job.salary_max) }} p/a
-{%- elif job.salary_min %}{{ rand(job.salary_min) }} p/a
-{%- else %}Salary per advert{% endif %}
+{% macro salary_line(job, t) -%}
+{% if job.salary_min and job.salary_max %}{{ rand(job.salary_min) }} – {{ rand(job.salary_max) }} {{ t.salary_pa }}
+{%- elif job.salary_min %}{{ rand(job.salary_min) }} {{ t.salary_pa }}
+{%- else %}{{ t.salary_per_advert }}{% endif %}
 {%- endmacro %}
 
-{% macro job_row(job, job_url, idx, today, soon_cutoff) -%}
+{% macro job_row(job, view, job_url, idx, today, soon_cutoff, t) -%}
 {% set closed = job.closing_date and today and job.closing_date < today %}
 <li class="job-row"
   data-idx="{{ idx }}"
@@ -20,81 +23,82 @@ R{{ "{:,.0f}".format(n).replace(",", " ") }}
   data-level="{{ job.salary_level or '' }}"
   data-salary="{{ job.salary_min or '' }}"
   data-closing="{{ job.closing_date or '' }}"
-  data-search="{{ (job.title ~ ' ' ~ job.department ~ ' ' ~ (job.city or '') ~ ' ' ~ job.reference_number ~ ' ' ~ job.category ~ ' ' ~ job.province) | lower | e }}">
+  data-search="{{ (view.title ~ ' ' ~ job.department ~ ' ' ~ (job.city or '') ~ ' ' ~ job.reference_number ~ ' ' ~ job.category ~ ' ' ~ job.province) | lower | e }}">
   <a class="row-link" href="{{ job_url }}">
-    <h3 class="row-title">{{ job.title }}</h3>
+    <h3 class="row-title">{{ view.title }}</h3>
     <p class="row-dept">{{ job.department }}</p>
     <div class="row-tags">
-      <span class="tag">{{ job.city or job.province }}</span>
-      {% if job.salary_level %}<span class="tag">Level {{ job.salary_level }}</span>{% endif %}
-      {% if job.number_of_posts > 1 %}<span class="tag posts">{{ job.number_of_posts }} posts</span>{% endif %}
-      <span class="tag salary">{{ salary_line(job) }}</span>
-      {% if closed %}<span class="tag closed">Closed</span>
-      {% else %}<span class="tag">Closes {{ job.closing_date_text or 'see advert' }}</span>{% endif %}
+      <span class="tag">{{ job.city or t.province.get(job.province, job.province) }}</span>
+      {% if job.salary_level %}<span class="tag">{{ t.tag_level }} {{ job.salary_level }}</span>{% endif %}
+      {% if job.number_of_posts > 1 %}<span class="tag posts">{{ job.number_of_posts }} {{ t.tag_posts }}</span>{% endif %}
+      <span class="tag salary">{{ salary_line(job, t) }}</span>
+      {% if closed %}<span class="tag closed">{{ t.tag_closed }}</span>
+      {% elif soon %}<span class="tag soon">{{ t.tag_closes_soon }}</span>
+      {% else %}<span class="tag">{{ t.tag_closes }} {{ job.closing_date_text or t.tag_see_advert }}</span>{% endif %}
     </div>
   </a>
 </li>
 {%- endmacro %}
 
-{% macro filter_sidebar(departments, provinces, categories) -%}
-<aside class="filters" id="filters-panel" aria-label="Filter vacancies">
+{% macro filter_sidebar(departments, provinces, categories, t) -%}
+<aside class="filters" id="filters-panel" aria-label="{{ t.filters_panel_aria }}">
   <form class="filters-inner" role="search" onsubmit="return false">
     <div class="field search">
-      <label class="visually-hidden" for="q">Search vacancies</label>
+      <label class="visually-hidden" for="q">{{ t.search_aria }}</label>
       <input class="control" type="search" id="q" name="q"
-             placeholder="Search job title, town, reference…" autocomplete="off">
+             placeholder="{{ t.search_placeholder }}" autocomplete="off">
     </div>
 
     <details open>
-      <summary>Department &amp; sector</summary>
+      <summary>{{ t.group_dept_sector }}</summary>
       <div class="field">
-        <label class="visually-hidden" for="f-department">Filter by department</label>
+        <label class="visually-hidden" for="f-department">{{ t.filter_dept_aria }}</label>
         <select class="control" id="f-department">
-          <option value="">All departments</option>
+          <option value="">{{ t.all_departments }}</option>
           {% for d in departments %}<option value="{{ d }}">{{ d }}</option>{% endfor %}
         </select>
       </div>
       <div class="field">
-        <label class="visually-hidden" for="f-category">Filter by sector</label>
+        <label class="visually-hidden" for="f-category">{{ t.filter_sector_aria }}</label>
         <select class="control" id="f-category">
-          <option value="">All sectors</option>
-          {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+          <option value="">{{ t.all_sectors }}</option>
+          {% for c in categories %}<option value="{{ c }}">{{ t.category.get(c, c) }}</option>{% endfor %}
         </select>
       </div>
     </details>
 
     <details open>
-      <summary>Location</summary>
+      <summary>{{ t.group_location }}</summary>
       <div class="field">
-        <label class="visually-hidden" for="f-province">Filter by province</label>
+        <label class="visually-hidden" for="f-province">{{ t.filter_province_aria }}</label>
         <select class="control" id="f-province">
-          <option value="">All provinces</option>
-          {% for p in provinces %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+          <option value="">{{ t.all_provinces }}</option>
+          {% for p in provinces %}<option value="{{ p }}">{{ t.province.get(p, p) }}</option>{% endfor %}
         </select>
       </div>
     </details>
 
     <details open>
-      <summary>Salary &amp; closing</summary>
+      <summary>{{ t.group_salary_closing }}</summary>
       <div class="field">
-        <label class="visually-hidden" for="f-salary">Filter by salary</label>
+        <label class="visually-hidden" for="f-salary">{{ t.filter_salary_aria }}</label>
         <select class="control" id="f-salary">
-          <option value="">Any salary</option>
-          <option value="0-200000">Under R200 000 a year</option>
-          <option value="200000-350000">R200 000 – R350 000 a year</option>
-          <option value="350000-500000">R350 000 – R500 000 a year</option>
-          <option value="500000-">R500 000 and above</option>
+          <option value="">{{ t.any_salary }}</option>
+          <option value="0-200000">{{ t.salary_band_0 }}</option>
+          <option value="200000-350000">{{ t.salary_band_1 }}</option>
+          <option value="350000-500000">{{ t.salary_band_2 }}</option>
+          <option value="500000-">{{ t.salary_band_3 }}</option>
         </select>
       </div>
       <div class="field">
-        <label class="toggle"><input type="checkbox" id="f-soon"> Closing within 14 days</label>
+        <label class="toggle"><input type="checkbox" id="f-soon"> {{ t.closing_within_14 }}</label>
       </div>
     </details>
 
     <div class="filters-foot">
-      <button type="button" class="btn-reset" id="reset">Reset all</button>
+      <button type="button" class="btn-reset" id="reset">{{ t.reset_all }}</button>
     </div>
-    <noscript><p class="no-js-note">Filters need JavaScript. Every vacancy is listed; use your browser's find (Ctrl/⌘-F).</p></noscript>
+    <noscript><p class="no-js-note">{{ t.no_js_note }}</p></noscript>
   </form>
 </aside>
 {%- endmacro %}

@@ -7,7 +7,7 @@ the site builder, and they define the JSON stored under ``data/circulars/``.
 from __future__ import annotations
 
 import re
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -43,6 +43,21 @@ PROVINCES: List[str] = [
 ]
 
 
+class JobTranslation(BaseModel):
+    """A machine translation of a job's free-text fields into one language.
+
+    Every field is optional so a partial or failed translation degrades
+    gracefully: any field left ``None`` falls back to the English source when
+    the site is rendered (see ``build.py``). The verbatim fields (reference,
+    salary, dates, addresses, department) are never translated.
+    """
+
+    title: Optional[str] = None
+    summary: Optional[str] = None
+    requirements: Optional[str] = None
+    duties: Optional[str] = None
+
+
 class Job(BaseModel):
     """One advertised post, after deterministic parsing (+ optional LLM enrichment)."""
 
@@ -74,6 +89,11 @@ class Job(BaseModel):
     enquiries: str = ""
     applications: str = ""
     notes: str = ""
+
+    # Machine translations of the free-text fields, keyed by language code
+    # ("af", "zu", "xh"). English is the canonical source and is never stored
+    # here; a missing language or field falls back to English at render time.
+    translations: Dict[str, JobTranslation] = Field(default_factory=dict)
 
     def is_open(self, today_iso: Optional[str] = None) -> bool:
         """True when the closing date is unknown or not yet passed."""
@@ -143,6 +163,33 @@ def enrichment_schema() -> dict:
             "is_readvertisement",
             "summary",
         ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Translation structured-output schema
+# ---------------------------------------------------------------------------
+# The translate stage (pipeline/translate.py) asks Claude to translate a post's
+# four free-text fields into one target language. The punctuation note on
+# requirements/duties is load-bearing: build.py's ``_sentence_items`` splits
+# those fields into bullet points on ``.``/``;`` boundaries, so the translation
+# must keep sentence-ending punctuation or the bullets collapse into one block.
+def translation_schema() -> dict:
+    _bullet = (
+        "Keep the same sentence boundaries as the English: end each sentence "
+        "with a full stop or semicolon and start each with a capital letter, so "
+        "the text can still be split into bullet points."
+    )
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "title": {"type": "string"},
+            "summary": {"type": "string"},
+            "requirements": {"type": "string", "description": _bullet},
+            "duties": {"type": "string", "description": _bullet},
+        },
+        "required": ["title", "summary", "requirements", "duties"],
     }
 
 

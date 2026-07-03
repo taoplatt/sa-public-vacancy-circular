@@ -1,52 +1,60 @@
 {% extends "base.html" %}
-{% from "_macros.html" import filter_sidebar, job_row with context %}
+{% from "_macros.html" import filter_sidebar, job_row %}
 {% block title %}{{ page_title }}{% endblock %}
-{% block description %}{{ total }} South African public-service vacancies from {{ circular.label }}. Search and filter by department, province, sector, salary and closing date.{% endblock %}
+{% block description %}{{ listing_description }}{% endblock %}
 
 {% block content %}
 <section class="hero">
   <div class="wrap">
     <h1>{{ heading }}</h1>
-    <p class="hero-meta"><strong>{{ circular.label }}</strong>{% if issued_human %} · issued {{ issued_human }}{% endif %}</p>
+    <p class="hero-meta"><strong>{{ circular.label }}</strong>{% if issued_human %} · {{ t.issued }} {{ issued_human }}{% endif %}</p>
   </div>
 </section>
 
 <main id="main">
   <div class="wrap">
     <div class="layout">
-      {{ filter_sidebar(departments, provinces, categories) }}
+      {{ filter_sidebar(departments, provinces, categories, t) }}
 
-      <section class="results" aria-label="Vacancies">
+      <section class="results" aria-label="{{ t.results_aria }}">
         <div class="results-head">
           <button type="button" class="btn-filters" id="toggle-filters" aria-expanded="true" aria-controls="filters-panel">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18M6 12h12M10 19h4"/></svg>
-            <span id="toggle-filters-label">Hide filters</span>
+            <span id="toggle-filters-label">{{ t.hide_filters }}</span>
           </button>
           <div class="sort-wrap">
-            <label for="sort">Sort</label>
-            <select class="control" id="sort" aria-label="Sort vacancies">
-              <option value="default">Closing soonest</option>
-              <option value="level-desc">Highest level</option>
-              <option value="az">A–Z</option>
+            <label for="sort">{{ t.sort_label }}</label>
+            <select class="control" id="sort" aria-label="{{ t.sort_label }}">
+              <option value="default">{{ t.sort_default }}</option>
+              <option value="level-desc">{{ t.sort_level_desc }}</option>
+              <option value="az">{{ t.sort_az }}</option>
             </select>
           </div>
         </div>
 
         <ol class="job-list" id="job-list" data-today="{{ today }}" data-soon="{{ soon_cutoff }}">
           {% for job in jobs %}
-          {{ job_row(job, job_prefix ~ job.slug ~ '.html', loop.index0, today, soon_cutoff) }}
+          {{ job_row(job, job_views[loop.index0], job_prefix ~ job.slug ~ '.html', loop.index0, today, soon_cutoff, t) }}
           {% endfor %}
         </ol>
 
         <p class="empty" id="empty-state" hidden>
-          No vacancies match your filters.
-          <button class="btn-reset" type="button" onclick="document.getElementById('reset').click()">Clear filters</button>
+          {{ t.empty_state }}
+          <button class="btn-reset" type="button" onclick="document.getElementById('reset').click()">{{ t.clear_filters }}</button>
         </p>
-        <nav class="pager" id="pager" aria-label="Pagination" hidden></nav>
+        <nav class="pager" id="pager" aria-label="{{ t.pager_aria }}" hidden></nav>
       </section>
     </div>
   </div>
 </main>
 {% endblock %}
 
-{% block scripts %}<script src="{{ root }}static/filter.js" defer></script>{% endblock %}
+{% block scripts %}
+<script>window.__I18N__ = {
+  prev: {{ t.pager_prev|tojson }}, next: {{ t.pager_next|tojson }},
+  pageOf: {{ t.pager_page_of|tojson }},
+  vacancy: {{ t.vacancies_singular|tojson }}, vacancies: {{ t.vacancies_plural|tojson }},
+  hideFilters: {{ t.hide_filters|tojson }}, showFilters: {{ t.show_filters|tojson }}
+};</script>
+<script src="{{ root }}static/filter.js" defer></script>
+{% endblock %}
