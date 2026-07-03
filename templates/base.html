@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Public Service Vacancies{% endblock %}</title>
+  <meta name="description" content="{% block description %}A fast, searchable listing of South African public-service vacancies, drawn each week from the DPSA Public Service Vacancy Circular.{% endblock %}">
+  <meta name="color-scheme" content="light">
+  <link rel="stylesheet" href="{{ root }}static/style.css">
+  <link rel="icon" href="data:image/svg+xml,{{ favicon }}">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="{{ root }}index.html">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="7" width="18" height="13" rx="2"></rect>
+          <path d="M8 7V5.5A1.5 1.5 0 0 1 9.5 4h5A1.5 1.5 0 0 1 16 5.5V7"></path>
+          <path d="M3 12h18"></path>
+        </svg>
+        <span class="brand-text">
+          <span class="brand-name">Public Service Vacancies</span>
+          <span class="brand-sub">South Africa</span>
+        </span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="{{ root }}index.html"{% if nav == 'latest' %} aria-current="page"{% endif %}>Latest</a>
+        <a href="{{ root }}archive.html"{% if nav == 'archive' %} aria-current="page"{% endif %}>Archive</a>
+        <a href="{{ root }}about.html"{% if nav == 'about' %} aria-current="page"{% endif %}>About</a>
+      </nav>
+    </div>
+  </header>
+
+  {% block content %}{% endblock %}
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>Vacancies are republished from the Department of Public Service and Administration (DPSA) Public Service Vacancy Circular. This is an independent, unofficial index.</p>
+      <p>Always apply to the department named in each advert, by its stated closing date. <a href="https://www.dpsa.gov.za/newsroom/psvc/">DPSA source &rarr;</a></p>
+    </div>
+  </footer>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

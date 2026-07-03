@@ -1,0 +1,78 @@
+{# Reusable fragments: a vacancy card and the filter controls. #}
+
+{% macro rand(n) -%}
+R{{ "{:,.0f}".format(n).replace(",", " ") }}
+{%- endmacro %}
+
+{% macro salary_line(job) -%}
+{% if job.salary_min and job.salary_max %}{{ rand(job.salary_min) }} – {{ rand(job.salary_max) }} p/a
+{%- elif job.salary_min %}{{ rand(job.salary_min) }} p/a
+{%- else %}Salary per advert{% endif %}
+{%- endmacro %}
+
+{% macro job_card(job, job_url, idx, today, soon_cutoff) -%}
+{% set closed = job.closing_date and today and job.closing_date < today %}
+{% set soon = job.closing_date and today and not closed and job.closing_date <= soon_cutoff %}
+<article class="card"
+  data-idx="{{ idx }}"
+  data-province="{{ job.province }}"
+  data-category="{{ job.category }}"
+  data-level="{{ job.salary_level or '' }}"
+  data-closing="{{ job.closing_date or '' }}"
+  data-posts="{{ job.number_of_posts }}"
+  data-search="{{ (job.title ~ ' ' ~ job.department ~ ' ' ~ (job.city or '') ~ ' ' ~ job.reference_number ~ ' ' ~ job.category ~ ' ' ~ job.province) | lower | e }}">
+  <p class="cat">{{ job.category }}</p>
+  <h3><a href="{{ job_url }}">{{ job.title }}</a></h3>
+  <p class="dept">{{ job.department }}</p>
+  <div class="chips">
+    {% if job.salary_level %}<span class="chip level">Level {{ job.salary_level }}</span>{% endif %}
+    {% if job.number_of_posts > 1 %}<span class="chip posts">{{ job.number_of_posts }} posts</span>{% endif %}
+    {% if closed %}<span class="chip closed">Closed</span>
+    {% elif soon %}<span class="chip soon">Closes soon</span>{% endif %}
+  </div>
+  <div class="meta">
+    <span>{{ job.city or job.province }}</span>
+    <span>{% if job.closing_date_text %}Closes {{ job.closing_date_text }}{% else %}See advert{% endif %}</span>
+    <span>{{ salary_line(job) }}</span>
+  </div>
+</article>
+{%- endmacro %}
+
+{% macro controls(provinces, categories) -%}
+<form class="controls" role="search" aria-label="Filter vacancies" onsubmit="return false">
+  <div class="wrap">
+    <div class="search-row">
+      <input type="search" id="q" name="q" placeholder="Search job title, department, town, reference…"
+             aria-label="Search vacancies" autocomplete="off">
+    </div>
+    <div class="filter-row">
+      <select id="f-province" aria-label="Province">
+        <option value="">All provinces</option>
+        {% for p in provinces %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+      </select>
+      <select id="f-category" aria-label="Sector">
+        <option value="">All sectors</option>
+        {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+      </select>
+      <select id="f-level" aria-label="Salary level">
+        <option value="">Any level</option>
+        <option value="1-4">Level 1–4</option>
+        <option value="5-8">Level 5–8</option>
+        <option value="9-12">Level 9–12</option>
+        <option value="13-16">Level 13+ (senior)</option>
+      </select>
+      <select id="sort" aria-label="Sort by">
+        <option value="default">Sort: default</option>
+        <option value="closing">Closing soonest</option>
+        <option value="level-desc">Highest level</option>
+      </select>
+      <label class="toggle"><input type="checkbox" id="f-soon"> Closing within 14 days</label>
+    </div>
+    <div class="result-line">
+      <span id="result-count" aria-live="polite">{{ total }} vacancies</span>
+      <button type="button" class="btn-reset" id="reset">Reset filters</button>
+    </div>
+    <noscript><p class="no-js-note">Filters need JavaScript. All vacancies are listed below; use your browser's find (Ctrl/⌘-F) to search.</p></noscript>
+  </div>
+</form>
+{%- endmacro %}

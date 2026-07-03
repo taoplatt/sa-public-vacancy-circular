@@ -1,0 +1,17 @@
+# Secrets — never commit your API key
+.env
+
+# Claude Code local-only settings (machine-specific permissions)
+.claude/settings.local.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Downloaded circular PDFs (large; re-fetchable). The extracted JSON under
+# data/circulars/ IS committed and is the archive's source of truth.
+data/raw/
+
+# Built site (GitHub Pages builds + deploys this from the Action)
+site/

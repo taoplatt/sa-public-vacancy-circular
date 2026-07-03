@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% from "_macros.html" import salary_line %}
+{% block title %}{{ job.title }} &middot; {{ job.department }}{% endblock %}
+{% block description %}{{ job.summary or job.title }} Closing date {{ job.closing_date_text or 'per advert' }}. Reference {{ job.reference_number }}.{% endblock %}
+
+{% block content %}
+<main id="main" class="detail">
+  <div class="wrap">
+    <p class="backlink"><a href="{{ back_url }}">&larr; {{ back_label }}</a></p>
+    <p class="eyebrow">{{ job.category }} &middot; {{ circular.label }}</p>
+    <h1>{{ job.title }}</h1>
+    <p class="dept">{{ job.department }}</p>
+
+    <dl class="factbar">
+      <div>
+        <dt>Location</dt>
+        <dd>{{ job.city or job.province }}{% if job.city and job.province != 'National' %}, {{ job.province }}{% endif %}</dd>
+      </div>
+      <div>
+        <dt>Salary</dt>
+        <dd>{{ salary_line(job) }}{% if job.salary_level %} &middot; Level {{ job.salary_level }}{% endif %}</dd>
+      </div>
+      <div>
+        <dt>Closing date</dt>
+        <dd>{{ job.closing_date_text or 'See advert' }}</dd>
+      </div>
+      <div>
+        <dt>Reference</dt>
+        <dd>{{ job.reference_number or '—' }}{% if job.number_of_posts > 1 %} &middot; {{ job.number_of_posts }} posts{% endif %}</dd>
+      </div>
+    </dl>
+
+    {% if job.summary %}
+    <section><h2>Overview</h2><p>{{ job.summary }}</p></section>
+    {% endif %}
+
+    {% if req_items %}
+    <section><h2>Requirements</h2><ul>{% for it in req_items %}<li>{{ it }}</li>{% endfor %}</ul></section>
+    {% elif job.requirements %}
+    <section><h2>Requirements</h2><p>{{ job.requirements }}</p></section>
+    {% endif %}
+
+    {% if duty_items %}
+    <section><h2>Duties</h2><ul>{% for it in duty_items %}<li>{{ it }}</li>{% endfor %}</ul></section>
+    {% elif job.duties %}
+    <section><h2>Duties</h2><p>{{ job.duties }}</p></section>
+    {% endif %}
+
+    {% if job.applications or job.enquiries %}
+    <div class="apply-box">
+      <h2>How to apply</h2>
+      {% if job.applications %}<p>{{ job.applications }}</p>{% endif %}
+      {% if job.enquiries %}<p><strong>Enquiries:</strong> {{ job.enquiries }}</p>{% endif %}
+    </div>
+    {% endif %}
+
+    {% if job.notes %}
+    <section><h2>Notes</h2><p>{{ job.notes }}</p></section>
+    {% endif %}
+
+    <p class="disclaimer">
+      Post {{ job.post_number }}, sourced from the DPSA {{ circular.label }}.
+      Apply directly to {{ job.department }}{% if job.closing_date_text %} by {{ job.closing_date_text }}{% endif %}{% if job.reference_number %}, quoting reference {{ job.reference_number }}{% endif %}.
+      This is an unofficial index; the advert in the circular is authoritative.
+    </p>
+  </div>
+</main>
+{% endblock %}

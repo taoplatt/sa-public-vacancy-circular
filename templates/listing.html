@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% from "_macros.html" import controls, job_card with context %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block description %}{{ total }} South African public-service vacancies from {{ circular.label }}. Search and filter by province, sector, salary level and closing date.{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="wrap">
+    <p class="eyebrow">{{ circular.label }}{% if circular.date_issued %} &middot; issued {{ circular.date_issued }}{% endif %}</p>
+    <h1>{{ heading }}</h1>
+    <p class="lead">{{ lead }}</p>
+    <p class="stat">{{ total }} vacancies across {{ dept_count }} departments and {{ prov_count }} provinces.</p>
+  </div>
+</section>
+
+{{ controls(provinces, categories) }}
+
+<main id="main">
+  <div class="wrap">
+    <div class="grid" id="job-grid" data-today="{{ today }}">
+      {% for job in jobs %}
+      {{ job_card(job, job_prefix ~ job.slug ~ '.html', loop.index0, today, soon_cutoff) }}
+      {% endfor %}
+    </div>
+    <p class="empty" id="empty-state" hidden>
+      No vacancies match your filters.
+      <button class="btn-reset" type="button" onclick="document.getElementById('reset').click()">Clear filters</button>
+    </p>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}<script src="{{ root }}static/filter.js" defer></script>{% endblock %}

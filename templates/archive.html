@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Archive &middot; Public Service Vacancies{% endblock %}
+{% block description %}Browse past weekly Public Service Vacancy Circulars.{% endblock %}
+
+{% block content %}
+<main id="main">
+  <div class="wrap prose">
+    <p class="eyebrow">Archive</p>
+    <h1>Past circulars</h1>
+    <p class="muted">Every weekly circular we have processed, newest first. Older adverts have almost certainly closed; they are kept for reference.</p>
+    <ul class="archive-list">
+      {% for c in circulars %}
+      <li>
+        <a href="circular/{{ c.slug }}.html">{{ c.label }}</a>
+        <span class="when">{% if c.date_issued %}issued {{ c.date_issued }} &middot; {% endif %}{{ c.jobs | length }} vacancies</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</main>
+{% endblock %}
