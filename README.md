@@ -84,6 +84,20 @@ data/       raw/ (PDFs, ignored) · circulars/ (extracted JSON, committed)
 run.py      orchestrator
 ```
 
+## Contributing
+
+Contributions are welcome. The pipeline is deterministic and runs locally with
+no API key (see **Running it**), so it's easy to reproduce and test changes.
+Please keep the guardrails that make the site usable on poor connections: no web
+fonts, no front-end frameworks, inline SVG only, and cards must still render
+with JavaScript switched off. Open an issue or a pull request.
+
+## License
+
+Released under the [MIT License](LICENSE). The vacancy content itself originates
+from the DPSA and remains subject to their terms; this project is an
+independent, unofficial index of that public information.
+
 ## Disclaimer
 
 This is an independent, unofficial index. Always apply to the department named
