@@ -116,6 +116,8 @@ def main() -> None:
                     help="Comma-separated language codes (default: af,zu,xh).")
     ap.add_argument("--translate-ui", action="store_true",
                     help="Regenerate i18n/<lang>.json chrome catalogs from en.json and exit.")
+    ap.add_argument("--force", action="store_true",
+                    help="Re-extract even if the circular is already in data/circulars/.")
     ap.add_argument("--out", default="site", help="Output directory (default: site).")
     args = ap.parse_args()
 
@@ -133,9 +135,18 @@ def main() -> None:
             pdf = fetch.fetch_latest()
             if not pdf:
                 raise SystemExit("Could not fetch a circular. Pass --pdf <path>.")
-        process_pdf(pdf, enrich=args.enrich, sync_limit=args.sync_limit,
-                    do_translate=args.translate, translate_sync_limit=args.translate_limit,
-                    languages=langs)
+        # Skip re-extraction if this circular is already archived -- the weekly
+        # cron re-fetches the same PDF until a new one is published, and enrich +
+        # translate cost API credits. --force overrides (e.g. after a code change).
+        number, year, _ = fetch.circular_meta_from_pdf(pdf)
+        out_json = os.path.join(DATA_DIR, "circular-%s-%s.json" % (number or 0, year or 0))
+        if os.path.exists(out_json) and not args.force:
+            print("[run] circular %s of %s already archived (%s); skipping extraction. "
+                  "Use --force to re-process." % (number, year, out_json))
+        else:
+            process_pdf(pdf, enrich=args.enrich, sync_limit=args.sync_limit,
+                        do_translate=args.translate, translate_sync_limit=args.translate_limit,
+                        languages=langs)
 
     circulars = load_all_circulars()
     if not circulars:
