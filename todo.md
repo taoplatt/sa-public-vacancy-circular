@@ -69,17 +69,26 @@ Two operational notes from the first real run:
       heavy over many weeks (sidecar files or git-lfs are fallbacks).
 
 ### 2. Actual deployment
-- [ ] Enable GitHub Pages: repo **Settings -> Pages -> Source: GitHub Actions**.
-- [ ] Add the **`ANTHROPIC_API_KEY`** repository secret (Settings -> Secrets and
-      variables -> Actions).
-- [ ] Trigger a manual run: **Actions -> Update vacancies -> Run workflow**
-      (`workflow_dispatch`) to enrich + translate + commit + deploy end-to-end.
-- [ ] Verify the **live** site: all four language trees, switcher links resolve
-      at the real base URL, `hreflang` alternates are absolute-correct under the
-      Pages path, MT notice on non-English only, JS-off still works.
-- [ ] Decide on a **custom domain** (nicer for sharing) + HTTPS.
-- [ ] Sanity-check the deployed payload size per language page (low-bandwidth is
-      a hard requirement) and that `static/` isn't bloated by the per-tree copies.
+**LIVE (2026-07-04): https://taoplatt.github.io/sa-public-vacancy-circular/**
+Deployed the verified 100% build via a `build_only` workflow_dispatch (no API
+spend). All four language trees serve HTTP 200; translations, `hreflang` and the
+MT notice verified on the live site.
+- [x] Enable GitHub Pages (Source: GitHub Actions) -- done via API (`build_type=workflow`).
+- [ ] **Add the `ANTHROPIC_API_KEY` repository secret.** STILL PENDING -- needed
+      for the weekly scheduled run (full fetch/enrich/translate). Until it is set,
+      a scheduled run builds any new circular English-only; existing committed
+      translations still serve, so nothing breaks.
+- [~] Trigger a manual run end-to-end: `build_only` deploy done + live. The FULL
+      enrich+translate+commit+deploy path is not exercised yet -- it runs on the
+      weekly cron (or a normal dispatch) once the secret is set.
+- [x] Verify the live site: four language trees, `hreflang` alternates
+      (en/af/xh/zu/x-default), MT notice on non-English only, job pages load,
+      JS-off works (cards are server-rendered).
+- [ ] Decide on a **custom domain** (nicer for sharing) + HTTPS. (Pages already
+      enforces HTTPS on the github.io URL.)
+- [x] Payload sanity (low-bandwidth): index ~36-47KB gzipped, job pages ~5.5KB,
+      css 4KB + js 2.2KB. Index raw ~480KB but served gzipped and renders all 575
+      cards for JS-off -- revisit with pagination only if it grows.
 
 ### 3. LinkedIn post / dissemination plan
 - [ ] Draft a **LinkedIn post**: what it is (free, fast, low-bandwidth, now in 4
