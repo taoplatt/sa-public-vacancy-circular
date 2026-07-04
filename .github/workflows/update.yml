@@ -7,6 +7,11 @@ on:
   schedule:
     - cron: "0 6 * * 6"
   workflow_dispatch:
+    inputs:
+      build_only:
+        description: "Rebuild + deploy from committed data only (skip fetch/enrich/translate)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write   # commit the week's extracted JSON to the archive
@@ -37,7 +42,13 @@ jobs:
       - name: Fetch, extract, translate and build
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python run.py --enrich --translate
+        run: |
+          if [ "${{ github.event.inputs.build_only }}" = "true" ]; then
+            echo "build_only: rebuilding site from committed data (no fetch/enrich/translate)"
+            python run.py --build-only
+          else
+            python run.py --enrich --translate
+          fi
 
       - name: Commit new circular data to the archive
         run: |
