@@ -39,13 +39,28 @@ Two operational notes from the first real run:
 ## Tomorrow
 
 ### 1. Optimise the full translation pipeline
-- [ ] **Self-healing gap-fill (batch retries).** ~1-2% of Batch requests fail
-      transiently every run and currently just fall back to English (we saw
-      25/1725 on the first real run). Add a pass that, after the batch, retries
-      only the missing (post, language) pairs synchronously -- with a larger
-      `max_tokens` so long posts do not truncate -- before writing the JSON, so
-      weekly runs reach ~100% unattended. A one-off version of this is what we
-      ran today (see `scratchpad/fill_translation_gaps.py`).
+- [ ] **Move off Claude Haiku to a much cheaper / open-source model (COST PRIORITY).**
+      Full enrich+translate is ~$8/circular on Haiku Batch. Goal: cut this hard,
+      ideally to ~free / self-hosted. Constraints from the earlier free-MT
+      discussion:
+      - The African languages gate the choice: isiZulu/isiXhosa rule out
+        LibreTranslate/Argos (no zu/xh models). Real options: self-hosted **Meta
+        NLLB** (open, strong zu/xh, compute-only), the Google web endpoint (flaky
+        at volume, ToS-grey), or a small open LLM (Qwen/Llama) for enrich + NLLB
+        for translate.
+      - A raw MT model will NOT preserve what the Haiku prompt currently guards:
+        verbatim reference numbers / dates / department + place names, and
+        sentence boundaries (the `.`/`;` bullet split in `build.py`). Plan for
+        entity-masking pre/post-processing, not a straight swap.
+      - Enrichment (category/city/salary/summary) can likely move to a cheap
+        local model, or tighten the deterministic parse so it needs less LLM.
+      - Keep the deterministic-first invariant: the site must still build with no
+        model at all.
+- [x] **Self-healing gap-fill (batch retries).** DONE (commit `312b63f`).
+      `translate_jobs` now retries the missing (post, language) pairs
+      synchronously after the batch (larger `max_tokens` for long posts), so
+      weekly runs reach ~100% unattended. No-op when the batch already covered
+      everything; best-effort on failure.
 - [ ] **Don't re-translate unchanged posts.** Right now `--translate` re-does all
       575 posts × 3 languages every run. Add incremental translation: skip a
       (post, language) whose source text already has a translation (or key by a
@@ -77,7 +92,10 @@ MT notice verified on the live site.
 - [ ] **Add the `ANTHROPIC_API_KEY` repository secret.** STILL PENDING -- needed
       for the weekly scheduled run (full fetch/enrich/translate). Until it is set,
       a scheduled run builds any new circular English-only; existing committed
-      translations still serve, so nothing breaks.
+      translations still serve, so nothing breaks. NOTE: the skip guard (commit
+      `6750924`) now makes the weekly cron a cheap no-op until a genuinely new
+      circular is published, so setting the secret no longer risks ~$8/week of
+      churn -- it only spends when there is new work.
 - [~] Trigger a manual run end-to-end: `build_only` deploy done + live. The FULL
       enrich+translate+commit+deploy path is not exercised yet -- it runs on the
       weekly cron (or a normal dispatch) once the secret is set.
