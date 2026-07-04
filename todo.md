@@ -2,7 +2,7 @@
 
 Working notes so we can pick up quickly. Newest context at the top.
 
-## Status (as of 2026-07-03)
+## Status (as of 2026-07-04)
 
 Multilingual support shipped to `main` (commit `9241983`): the site builds in
 English (canonical) + Afrikaans/isiZulu/isiXhosa. Chrome is translated from
@@ -11,20 +11,41 @@ via the Batch API into `Job.translations` (`pipeline/translate.py`). Filtering,
 the language switcher, `hreflang`, and the machine-translation notice are all
 verified locally.
 
-**Not yet done:** the committed circular JSON has **no job-content translations
-yet** (chrome is translated; per-post titles/requirements/duties fall back to
-English). Populating them + deploying is tomorrow's job.
+**Done (2026-07-04): circular 23 of 2026 is fully enriched AND translated.**
+All 575 posts enriched (category/city/salary/summary) and all **1725/1725**
+translation units (575 posts x af/zu/xh) populated inline under
+`Job.translations`. Two commits: `b9ae844` (bug fix, below) and `0207b62`
+(the populated JSON). Site rebuilds clean (4 languages, 2316 pages).
 
-Immediate command to populate the current circular locally (Batch, ~$4-8, async):
-```bash
-python run.py --pdf "PSV CIRCULAR 23 of 2026.pdf" --enrich --translate
-```
+Ran with: `python run.py --pdf "PSV CIRCULAR 23 of 2026.pdf" --enrich --translate`.
+
+Bug found + fixed along the way: a circular can **reuse a post number across
+annexures** (23/287 appears twice in this one), which crashed the Batch API
+(duplicate `custom_id`) and would have silently collapsed the duplicate when
+mapping results back. `extract.py` and `translate.py` now key Batch requests by
+**list index**, not post_number (commit `b9ae844`).
+
+Two operational notes from the first real run:
+- Batches lose ~1-2% of requests to transient failures (we saw 25/1725); they
+  fall back to English gracefully. A one-off synchronous gap-fill (higher
+  `max_tokens` for long posts) filled the rest. See the "self-healing" item below.
+- The Anthropic **API credit balance gates every run** (enrich + translate) --
+  keep it funded for the weekly CI job.
+
+**Next: deployment (section 2).**
 
 ---
 
 ## Tomorrow
 
 ### 1. Optimise the full translation pipeline
+- [ ] **Self-healing gap-fill (batch retries).** ~1-2% of Batch requests fail
+      transiently every run and currently just fall back to English (we saw
+      25/1725 on the first real run). Add a pass that, after the batch, retries
+      only the missing (post, language) pairs synchronously -- with a larger
+      `max_tokens` so long posts do not truncate -- before writing the JSON, so
+      weekly runs reach ~100% unattended. A one-off version of this is what we
+      ran today (see `scratchpad/fill_translation_gaps.py`).
 - [ ] **Don't re-translate unchanged posts.** Right now `--translate` re-does all
       575 posts × 3 languages every run. Add incremental translation: skip a
       (post, language) whose source text already has a translation (or key by a
