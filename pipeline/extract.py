@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import os
 import time
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from .schema import CATEGORIES, Job, enrichment_schema
 
@@ -139,9 +139,11 @@ def enrich_jobs(
     targets = jobs[:limit] if limit else jobs
     client = anthropic.Anthropic()
 
+    # Key by list index, not post_number: a circular can repeat a post number
+    # across annexures, and Batch custom_ids must be unique within a batch.
     requests = [
-        {"custom_id": job.post_number.replace("/", "_"), "params": _request_params(job)}
-        for job in targets
+        {"custom_id": str(i), "params": _request_params(job)}
+        for i, job in enumerate(targets)
     ]
     if verbose:
         print("[extract] submitting batch of %d jobs (model=%s)…" % (len(requests), MODEL))
@@ -155,14 +157,17 @@ def enrich_jobs(
             print("[extract] batch %s: %s" % (batch.id, b.processing_status))
         time.sleep(poll_seconds)
 
-    by_id: Dict[str, Job] = {j.post_number.replace("/", "_"): j for j in targets}
     ok = 0
     for result in client.messages.batches.results(batch.id):
         if result.result.type != "succeeded":
             continue
-        job = by_id.get(result.custom_id)
-        if not job:
+        try:
+            idx = int(result.custom_id)
+        except ValueError:
             continue
+        if not 0 <= idx < len(targets):
+            continue
+        job = targets[idx]
         msg = result.result.message
         text = next((blk.text for blk in msg.content if blk.type == "text"), "")
         try:

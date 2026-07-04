@@ -167,9 +167,11 @@ def _request_params(job: Job, lang: str) -> dict:
     }
 
 
-def _custom_id(job: Job, lang: str) -> str:
-    # post_number is unique per circular; "__<lang>" disambiguates the language.
-    return "%s__%s" % (job.post_number.replace("/", "_"), lang)
+def _custom_id(idx: int, lang: str) -> str:
+    # Key by list index, not post_number: a circular can repeat a post number
+    # across annexures, and Batch custom_ids must be unique within a batch.
+    # "__<lang>" disambiguates the language.
+    return "%d__%s" % (idx, lang)
 
 
 def translate_jobs(
@@ -201,8 +203,8 @@ def translate_jobs(
     client = anthropic.Anthropic()
 
     requests = [
-        {"custom_id": _custom_id(job, lang), "params": _request_params(job, lang)}
-        for job in targets
+        {"custom_id": _custom_id(i, lang), "params": _request_params(job, lang)}
+        for i, job in enumerate(targets)
         for lang in languages
     ]
     if verbose:
@@ -220,18 +222,18 @@ def translate_jobs(
             print("[translate] batch %s: %s" % (batch.id, b.processing_status))
         time.sleep(poll_seconds)
 
-    by_id: Dict[str, Job] = {job.post_number.replace("/", "_"): job for job in targets}
     ok = 0
     for result in client.messages.batches.results(batch.id):
         if result.result.type != "succeeded":
             continue
         try:
             key, lang = result.custom_id.rsplit("__", 1)
+            idx = int(key)
         except ValueError:
             continue
-        job = by_id.get(key)
-        if not job:
+        if not 0 <= idx < len(targets):
             continue
+        job = targets[idx]
         msg = result.result.message
         text = next((blk.text for blk in msg.content if blk.type == "text"), "")
         try:
