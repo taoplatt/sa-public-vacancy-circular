@@ -174,6 +174,57 @@ def _custom_id(idx: int, lang: str) -> str:
     return "%d__%s" % (idx, lang)
 
 
+def _translated(job: Job, lang: str) -> bool:
+    """True if this post already has a usable translation for ``lang``."""
+    tr = job.translations.get(lang)
+    return bool(tr and (tr.title or "").strip())
+
+
+def _fill_gaps_sync(
+    client,
+    targets: List[Job],
+    languages: List[str],
+    *,
+    max_tokens: int = 8000,
+    verbose: bool = True,
+) -> int:
+    """Synchronously retry any (post, language) the batch left untranslated.
+
+    A small fraction of Batch requests fail transiently, and very long posts
+    can truncate at the batch ``max_tokens``; those fields silently fall back
+    to English. This pass retries just the gaps with a larger ``max_tokens`` so
+    weekly runs reach ~100% unattended. Best-effort: a failure here (e.g. no
+    API credit) simply keeps the English fallback.
+    """
+    pending = [
+        (job, lang)
+        for job in targets
+        for lang in languages
+        if not _translated(job, lang)
+    ]
+    if not pending:
+        return 0
+    if verbose:
+        print("[translate] gap-fill: retrying %d missing (post, language) pair(s)…" % len(pending))
+    filled = 0
+    for job, lang in pending:
+        params = _request_params(job, lang)
+        params["max_tokens"] = max_tokens  # avoid truncation on long posts
+        try:
+            msg = client.messages.create(**params)
+            text = next((blk.text for blk in msg.content if blk.type == "text"), "")
+            _apply(job, lang, json.loads(text))
+            if _translated(job, lang):
+                filled += 1
+        except Exception as exc:  # best-effort: keep English on any failure
+            if verbose:
+                print("[translate]   gap-fill failed for %s/%s: %s"
+                      % (job.post_number, lang, type(exc).__name__))
+    if verbose:
+        print("[translate] gap-fill: filled %d/%d." % (filled, len(pending)))
+    return filled
+
+
 def translate_jobs(
     jobs: List[Job],
     *,
@@ -244,6 +295,10 @@ def translate_jobs(
         ok += 1
     if verbose:
         print("[translate] translated %d/%d requests." % (ok, len(requests)))
+
+    # Self-heal: retry any (post, language) the batch missed, synchronously,
+    # so a weekly run reaches ~100% without a manual follow-up pass.
+    _fill_gaps_sync(client, targets, languages, verbose=verbose)
     return jobs
 
 
