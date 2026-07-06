@@ -1,22 +1,24 @@
 """Optional machine translation of parsed jobs into South Africa's languages.
 
 The deterministic parse (and optional enrichment) produce complete English
-records. This step asks Claude (Haiku 4.5) to translate the four free-text
-fields of each post -- ``title``, ``summary``, ``requirements`` and ``duties`` --
-into Afrikaans, isiZulu and isiXhosa. English stays the canonical source; the
-translations are merged onto each ``Job`` under ``job.translations[lang]``.
+records. This step asks the configured model (``PSVC_MODEL``, default GLM 5.2)
+via OpenRouter to translate the four free-text fields of each post -- ``title``,
+``summary``, ``requirements`` and ``duties`` -- into Afrikaans, isiZulu and
+isiXhosa. English stays the canonical source; the translations are merged onto
+each ``Job`` under ``job.translations[lang]``.
 
 Design notes (mirrors ``pipeline/extract.py``)
 ---------------------------------------------
-* Uses the **Batch API** (50% cost, async) -- a natural fit for the weekly run.
-  One request per (job, language): bounded output, per-language cached prompt,
-  and a failure in one language never costs the others.
-* A large, stable system prompt (glossary + rules) is **prompt-cached** per
-  language; only the compact job payload varies per request.
+* OpenRouter has no batch endpoint, so requests are issued synchronously and
+  fanned out over a small thread pool (see ``pipeline/llm.py``). One request per
+  (job, language): bounded output, and a failure in one language never costs the
+  others.
+* A gap-fill pass retries any (post, language) the first pass missed, with a
+  larger ``max_tokens`` for very long posts, so weekly runs reach ~100%.
 * Best-effort: any post whose result is missing or invalid keeps English (the
   render falls back field-by-field), so the site is never degraded by this step.
-* If ``ANTHROPIC_API_KEY`` / an ``ant`` profile is not available, the whole step
-  is skipped and the jobs are returned unchanged.
+* If ``OPENROUTER_API_KEY`` is not available, the whole step is skipped and the
+  jobs are returned unchanged.
 
 Verbatim policy: reference/post numbers, salaries, dates, addresses
 (enquiries/applications/notes) and department names are **not** translated --
@@ -26,12 +28,10 @@ from __future__ import annotations
 
 import json
 import os
-import time
 from typing import Dict, List, Optional
 
+from . import llm
 from .schema import Job, JobTranslation, translation_schema
-
-MODEL = "claude-haiku-4-5"
 
 # English is the canonical source and is never translated.
 TARGET_LANGUAGES = ["af", "zu", "xh"]
@@ -127,15 +127,6 @@ def _job_payload(job: Job) -> str:
     )
 
 
-def _has_credentials() -> bool:
-    if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"):
-        return True
-    # An `ant auth login` profile also works with a zero-arg client.
-    import shutil
-
-    return shutil.which("ant") is not None
-
-
 def _apply(job: Job, lang: str, data: dict) -> None:
     """Merge one language's validated translation onto a job (best-effort)."""
     tr = job.translations.get(lang) or JobTranslation()
@@ -146,55 +137,36 @@ def _apply(job: Job, lang: str, data: dict) -> None:
     job.translations[lang] = tr
 
 
-def _request_params(job: Job, lang: str) -> dict:
-    return {
-        "model": MODEL,
-        "max_tokens": 4000,
-        "system": [
-            {
-                "type": "text",
-                "text": _system_prompt(lang),
-                "cache_control": {"type": "ephemeral"},
-            }
-        ],
-        "messages": [{"role": "user", "content": _job_payload(job)}],
-        "output_config": {
-            "format": {
-                "type": "json_schema",
-                "schema": translation_schema(),
-            }
-        },
-    }
-
-
-def _custom_id(idx: int, lang: str) -> str:
-    # Key by list index, not post_number: a circular can repeat a post number
-    # across annexures, and Batch custom_ids must be unique within a batch.
-    # "__<lang>" disambiguates the language.
-    return "%d__%s" % (idx, lang)
-
-
 def _translated(job: Job, lang: str) -> bool:
     """True if this post already has a usable translation for ``lang``."""
     tr = job.translations.get(lang)
     return bool(tr and (tr.title or "").strip())
 
 
+def _translate_one(job: Job, lang: str, *, max_tokens: int = 6000) -> Optional[dict]:
+    return llm.chat_json(
+        _system_prompt(lang),
+        _job_payload(job),
+        translation_schema(),
+        max_tokens=max_tokens,
+        schema_name="translation",
+    )
+
+
 def _fill_gaps_sync(
-    client,
     targets: List[Job],
     languages: List[str],
     *,
-    max_tokens: int = 8000,
+    max_tokens: int = 10000,
     verbose: bool = True,
 ) -> int:
-    """Synchronously retry any (post, language) the batch left untranslated.
+    """Retry any (post, language) the first pass left untranslated.
 
-    A small fraction of Batch requests fail transiently, and very long posts
-    can truncate at the batch ``max_tokens``; those fields silently fall back
-    to English. This pass retries just the gaps with a larger ``max_tokens`` so
-    weekly runs reach ~100% unattended. Best-effort: a failure here (e.g. no
-    API credit) simply keeps the English fallback.
+    A small fraction of requests fail transiently, and very long posts can
+    truncate at the default ``max_tokens``; those fields silently fall back to
+    English. This pass retries just the gaps with a larger ``max_tokens`` so
+    weekly runs reach ~100% unattended. Best-effort: a failure here (e.g. no API
+    credit) simply keeps the English fallback.
     """
     pending = [
         (job, lang)
@@ -208,18 +180,11 @@ def _fill_gaps_sync(
         print("[translate] gap-fill: retrying %d missing (post, language) pair(s)…" % len(pending))
     filled = 0
     for job, lang in pending:
-        params = _request_params(job, lang)
-        params["max_tokens"] = max_tokens  # avoid truncation on long posts
-        try:
-            msg = client.messages.create(**params)
-            text = next((blk.text for blk in msg.content if blk.type == "text"), "")
-            _apply(job, lang, json.loads(text))
+        data = _translate_one(job, lang, max_tokens=max_tokens)
+        if isinstance(data, dict):
+            _apply(job, lang, data)
             if _translated(job, lang):
                 filled += 1
-        except Exception as exc:  # best-effort: keep English on any failure
-            if verbose:
-                print("[translate]   gap-fill failed for %s/%s: %s"
-                      % (job.post_number, lang, type(exc).__name__))
     if verbose:
         print("[translate] gap-fill: filled %d/%d." % (filled, len(pending)))
     return filled
@@ -230,75 +195,42 @@ def translate_jobs(
     *,
     languages: Optional[List[str]] = None,
     limit: Optional[int] = None,
-    poll_seconds: int = 30,
     verbose: bool = True,
 ) -> List[Job]:
-    """Translate jobs in place via the Batch API. Returns the same list."""
+    """Translate jobs in place via concurrent OpenRouter calls. Returns the same list."""
     languages = languages or TARGET_LANGUAGES
-    if not _has_credentials():
+    if not llm.have_credentials():
         if verbose:
             print(
-                "[translate] No ANTHROPIC_API_KEY / ant profile found; "
-                "keeping English only (site still builds, falls back to English)."
+                "[translate] No OPENROUTER_API_KEY found; keeping English only "
+                "(site still builds, falls back to English)."
             )
         return jobs
 
-    try:
-        import anthropic
-    except ImportError:
-        if verbose:
-            print("[translate] anthropic SDK not installed; skipping translation.")
-        return jobs
-
     targets = jobs[:limit] if limit else jobs
-    client = anthropic.Anthropic()
-
-    requests = [
-        {"custom_id": _custom_id(i, lang), "params": _request_params(job, lang)}
-        for i, job in enumerate(targets)
-        for lang in languages
-    ]
+    pairs = [(i, lang) for i in range(len(targets)) for lang in languages]
     if verbose:
         print(
-            "[translate] submitting batch of %d requests (%d jobs x %d languages, "
-            "model=%s)..." % (len(requests), len(targets), len(languages), MODEL)
+            "[translate] translating %d requests (%d jobs x %d languages, "
+            "model=%s)…" % (len(pairs), len(targets), len(languages), llm.model_name())
         )
-    batch = client.messages.batches.create(requests=requests)
 
-    while True:
-        b = client.messages.batches.retrieve(batch.id)
-        if b.processing_status == "ended":
-            break
-        if verbose:
-            print("[translate] batch %s: %s" % (batch.id, b.processing_status))
-        time.sleep(poll_seconds)
+    def worker(_k: int, pair) -> Optional[dict]:
+        i, lang = pair
+        return _translate_one(targets[i], lang)
 
+    results = llm.map_concurrent(worker, pairs)
     ok = 0
-    for result in client.messages.batches.results(batch.id):
-        if result.result.type != "succeeded":
-            continue
-        try:
-            key, lang = result.custom_id.rsplit("__", 1)
-            idx = int(key)
-        except ValueError:
-            continue
-        if not 0 <= idx < len(targets):
-            continue
-        job = targets[idx]
-        msg = result.result.message
-        text = next((blk.text for blk in msg.content if blk.type == "text"), "")
-        try:
-            data = json.loads(text)
-        except json.JSONDecodeError:
-            continue
-        _apply(job, lang, data)
-        ok += 1
+    for (i, lang), data in zip(pairs, results):
+        if isinstance(data, dict):
+            _apply(targets[i], lang, data)
+            ok += 1
     if verbose:
-        print("[translate] translated %d/%d requests." % (ok, len(requests)))
+        print("[translate] translated %d/%d requests." % (ok, len(pairs)))
 
-    # Self-heal: retry any (post, language) the batch missed, synchronously,
-    # so a weekly run reaches ~100% without a manual follow-up pass.
-    _fill_gaps_sync(client, targets, languages, verbose=verbose)
+    # Self-heal: retry any (post, language) the first pass missed, so a weekly
+    # run reaches ~100% without a manual follow-up.
+    _fill_gaps_sync(targets, languages, verbose=verbose)
     return jobs
 
 
@@ -309,33 +241,16 @@ def translate_sync(
     limit: int = 5,
     verbose: bool = True,
 ) -> List[Job]:
-    """Synchronous translation of a few jobs, for local testing without batching."""
-    languages = languages or TARGET_LANGUAGES
-    if not _has_credentials():
-        if verbose:
-            print("[translate] No credentials; skipping sync translation.")
-        return jobs
-    import anthropic
-
-    client = anthropic.Anthropic()
-    for job in jobs[:limit]:
-        for lang in languages:
-            params = _request_params(job, lang)
-            msg = client.messages.create(**params)
-            text = next((blk.text for blk in msg.content if blk.type == "text"), "")
-            try:
-                _apply(job, lang, json.loads(text))
-            except json.JSONDecodeError:
-                pass
-    return jobs
+    """Translate only the first ``limit`` jobs -- a quick local check."""
+    return translate_jobs(jobs, languages=languages, limit=limit, verbose=verbose)
 
 
 # ---------------------------------------------------------------------------
 # UI (chrome) catalog translation
 # ---------------------------------------------------------------------------
-# One small synchronous call per language translates the whole English chrome
-# catalog (i18n/en.json). Run only when the English strings change; the output
-# is committed and hand-editable.
+# One small call per language translates the whole English chrome catalog
+# (i18n/en.json). Run only when the English strings change; the output is
+# committed and hand-editable.
 _UI_SYSTEM = (
     "You translate the user-interface text of a South African public-service "
     "job website from English into %s. You are given a JSON object of English "
@@ -371,20 +286,17 @@ def _extract_json(text: str) -> Optional[dict]:
 
 def translate_ui(src_catalog: dict, lang: str, *, verbose: bool = True) -> Optional[dict]:
     """Translate one English chrome catalog into ``lang``. Returns None on failure."""
-    if not _has_credentials():
+    if not llm.have_credentials():
         if verbose:
-            print("[translate] No credentials; cannot build UI catalog for %s." % lang)
+            print("[translate] No OPENROUTER_API_KEY; cannot build UI catalog for %s." % lang)
         return None
-    import anthropic
-
-    client = anthropic.Anthropic()
-    msg = client.messages.create(
-        model=MODEL,
+    text = llm.chat_text(
+        _UI_SYSTEM % LANGUAGE_NAMES.get(lang, lang),
+        json.dumps(src_catalog, ensure_ascii=False),
         max_tokens=8000,
-        system=_UI_SYSTEM % LANGUAGE_NAMES.get(lang, lang),
-        messages=[{"role": "user", "content": json.dumps(src_catalog, ensure_ascii=False)}],
     )
-    text = next((blk.text for blk in msg.content if blk.type == "text"), "")
+    if not text:
+        return None
     return _extract_json(text)
 
 

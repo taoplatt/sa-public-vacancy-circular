@@ -41,7 +41,9 @@ jobs:
 
       - name: Fetch, extract, translate and build
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          PSVC_MODEL: ${{ vars.PSVC_MODEL }}          # optional; defaults to z-ai/glm-5.2
+          PSVC_DOMAIN: ${{ vars.CUSTOM_DOMAIN }}      # optional; custom domain -> site/CNAME
         run: |
           if [ "${{ github.event.inputs.build_only }}" = "true" ]; then
             echo "build_only: rebuilding site from committed data (no fetch/enrich/translate)"

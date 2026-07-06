@@ -25,17 +25,17 @@ fetch → segment → parse → (enrich) → (translate) → build → deploy
    record: title, reference, salary + level + band, location, closing date
    (ISO), sector, requirements, duties, how to apply. Fully deterministic, so
    the site is complete with no API call.
-4. **enrich** (`pipeline/extract.py`, optional) — Claude **Haiku 4.5** via the
-   **Message Batches API** refines the fields regex handles poorly (sector,
-   city, salary band, ISO date) and writes a one-line summary. Best-effort: any
-   job it can't improve keeps its deterministic values. Skipped automatically
-   when no API key is present.
-5. **translate** (`pipeline/translate.py`, optional) — Claude **Haiku 4.5** via
-   the **Message Batches API** translates each post's free text (title, summary,
-   requirements, duties) into **Afrikaans, isiZulu and isiXhosa**. English stays
-   canonical; reference numbers, salaries, dates, addresses and department names
-   are kept verbatim. Best-effort: anything it can't translate falls back to
-   English. Skipped automatically when no API key is present.
+4. **enrich** (`pipeline/extract.py`, optional) — an LLM via **OpenRouter**
+   (model set by `PSVC_MODEL`, default GLM 5.2) refines the fields regex handles
+   poorly (sector, city, salary band, ISO date) and writes a one-line summary.
+   Best-effort: any job it can't improve keeps its deterministic values. Skipped
+   automatically when no API key is present.
+5. **translate** (`pipeline/translate.py`, optional) — the same OpenRouter model
+   translates each post's free text (title, summary, requirements, duties) into
+   **Afrikaans, isiZulu and isiXhosa**. English stays canonical; reference
+   numbers, salaries, dates, addresses and department names are kept verbatim.
+   Best-effort: anything it can't translate falls back to English. Skipped
+   automatically when no API key is present.
 6. **build** (`pipeline/build.py`) — Jinja2 renders a static site once per
    language (English at the root, `af/`, `zu/`, `xh/` subtrees): a landing page
    for the latest circular (search + filters + cards), a detail page per post,
@@ -67,9 +67,9 @@ pip install -r requirements.txt          # needs poppler's pdftotext on PATH
 
 python run.py --pdf "PSV CIRCULAR 23 of 2026.pdf"   # process a local PDF
 python run.py                                        # fetch the newest circular
-python run.py --enrich                               # + LLM enrichment (needs ANTHROPIC_API_KEY)
+python run.py --enrich                               # + LLM enrichment (needs OPENROUTER_API_KEY)
 python run.py --enrich --sync-limit 5                # enrich 5 jobs synchronously (quick test)
-python run.py --enrich --translate                   # + translate to af/zu/xh via Batch
+python run.py --enrich --translate                   # + translate to af/zu/xh via OpenRouter
 python run.py --translate --translate-limit 3        # translate 3 jobs synchronously (quick test)
 python run.py --translate-ui                          # regenerate i18n/<lang>.json from en.json
 python run.py --build-only                           # rebuild the site (all languages) from data/
@@ -84,12 +84,19 @@ python -m http.server -d site                        # preview at http://localho
 ## Deployment
 
 `.github/workflows/update.yml` runs weekly (and on demand): it fetches the
-newest circular, enriches and translates with Claude (using the
-`ANTHROPIC_API_KEY` repo secret), commits the new JSON to the archive (the
-translations live inside those JSON files), and deploys `site/` to GitHub Pages.
-Enable Pages (Settings → Pages → Source: GitHub Actions) and add the secret to
-activate enrichment and translation; without it the site still builds fully from
-the deterministic parse (in English).
+newest circular, enriches and translates via **OpenRouter** (using the
+`OPENROUTER_API_KEY` repo secret; pick a model with the optional `PSVC_MODEL`
+repo variable), commits the new JSON to the archive (the translations live
+inside those JSON files), and deploys `site/` to GitHub Pages. Enable Pages
+(Settings → Pages → Source: GitHub Actions) and add the secret to activate
+enrichment and translation; without it the site still builds fully from the
+deterministic parse (in English).
+
+For a **custom domain**, set the `CUSTOM_DOMAIN` repo variable (e.g.
+`jobs.example.com`); the build writes `site/CNAME` so Pages keeps it. Set the
+same domain in Settings → Pages for HTTPS, and add the DNS record at your
+registrar (a subdomain → `CNAME` to `taoplatt.github.io`; an apex domain →
+GitHub's four `A` records).
 
 ## Layout
 

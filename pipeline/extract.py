@@ -1,30 +1,30 @@
-"""Optional LLM enrichment of parsed jobs, via the Claude Message Batches API.
+"""Optional LLM enrichment of parsed jobs, via OpenRouter.
 
-The deterministic parser already fills every field. This step asks Claude
-(Haiku 4.5) to refine the handful of fields that regex handles poorly:
-sector ``category``, a clean ``city``, normalised salary band / level, an ISO
-``closing_date``, and a one-line plain-language ``summary``.
+The deterministic parser already fills every field. This step asks the
+configured model (``PSVC_MODEL``, default GLM 5.2) to refine the handful of
+fields that regex handles poorly: sector ``category``, a clean ``city``,
+normalised salary band / level, an ISO ``closing_date``, and a one-line
+plain-language ``summary``.
 
 Design notes
 ------------
-* Uses the **Batch API** (50% cost, async) — a natural fit for a weekly run.
-* A large, stable system prompt (schema + rules) is **prompt-cached**; the only
-  per-request variation is the compact job payload, keeping input cost low.
+* OpenRouter has no batch endpoint, so requests are issued synchronously and
+  fanned out over a small thread pool (see ``pipeline/llm.py``).
+* Structured output is requested via ``response_format: json_schema``; the
+  large, stable system prompt (schema + rules) is identical across requests, so
+  only the compact job payload varies.
 * Enrichment is best-effort: any job whose result is missing or invalid keeps
   its deterministic values, so the site is never degraded by this step.
-* If ``ANTHROPIC_API_KEY`` / an ``ant`` profile is not available, the whole
-  step is skipped and the deterministic jobs are returned unchanged.
+* If ``OPENROUTER_API_KEY`` is not available, the whole step is skipped and the
+  deterministic jobs are returned unchanged.
 """
 from __future__ import annotations
 
 import json
-import os
-import time
 from typing import List, Optional
 
+from . import llm
 from .schema import CATEGORIES, Job, enrichment_schema
-
-MODEL = "claude-haiku-4-5"
 
 SYSTEM_PROMPT = (
     "You normalise South African public-service job adverts into structured "
@@ -64,15 +64,6 @@ def _job_payload(job: Job) -> str:
     )
 
 
-def _has_credentials() -> bool:
-    if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"):
-        return True
-    # An `ant auth login` profile also works with a zero-arg client.
-    import shutil
-
-    return shutil.which("ant") is not None
-
-
 def _apply(job: Job, data: dict) -> None:
     """Merge a validated enrichment result onto a job (deterministic fallback kept)."""
     cat = data.get("category")
@@ -92,110 +83,45 @@ def _apply(job: Job, data: dict) -> None:
         job.summary = str(data["summary"]).strip()
 
 
-def _request_params(job: Job) -> dict:
-    return {
-        "model": MODEL,
-        "max_tokens": 400,
-        "system": [
-            {
-                "type": "text",
-                "text": SYSTEM_PROMPT,
-                "cache_control": {"type": "ephemeral"},
-            }
-        ],
-        "messages": [{"role": "user", "content": _job_payload(job)}],
-        "output_config": {
-            "format": {
-                "type": "json_schema",
-                "schema": enrichment_schema(),
-            }
-        },
-    }
-
-
 def enrich_jobs(
     jobs: List[Job],
     *,
     limit: Optional[int] = None,
-    poll_seconds: int = 30,
     verbose: bool = True,
 ) -> List[Job]:
-    """Enrich jobs in place via the Batch API. Returns the same list."""
-    if not _has_credentials():
+    """Enrich jobs in place via concurrent OpenRouter calls. Returns the same list."""
+    if not llm.have_credentials():
         if verbose:
             print(
-                "[extract] No ANTHROPIC_API_KEY / ant profile found; "
-                "keeping deterministic values (site is still complete)."
+                "[extract] No OPENROUTER_API_KEY found; keeping deterministic "
+                "values (site is still complete)."
             )
         return jobs
 
-    try:
-        import anthropic
-    except ImportError:
-        if verbose:
-            print("[extract] anthropic SDK not installed; skipping enrichment.")
-        return jobs
-
     targets = jobs[:limit] if limit else jobs
-    client = anthropic.Anthropic()
-
-    # Key by list index, not post_number: a circular can repeat a post number
-    # across annexures, and Batch custom_ids must be unique within a batch.
-    requests = [
-        {"custom_id": str(i), "params": _request_params(job)}
-        for i, job in enumerate(targets)
-    ]
     if verbose:
-        print("[extract] submitting batch of %d jobs (model=%s)…" % (len(requests), MODEL))
-    batch = client.messages.batches.create(requests=requests)
+        print("[extract] enriching %d jobs (model=%s)…" % (len(targets), llm.model_name()))
 
-    while True:
-        b = client.messages.batches.retrieve(batch.id)
-        if b.processing_status == "ended":
-            break
-        if verbose:
-            print("[extract] batch %s: %s" % (batch.id, b.processing_status))
-        time.sleep(poll_seconds)
+    def worker(_idx: int, job: Job) -> Optional[dict]:
+        return llm.chat_json(
+            SYSTEM_PROMPT,
+            _job_payload(job),
+            enrichment_schema(),
+            max_tokens=800,
+            schema_name="enrichment",
+        )
 
+    results = llm.map_concurrent(worker, targets)
     ok = 0
-    for result in client.messages.batches.results(batch.id):
-        if result.result.type != "succeeded":
-            continue
-        try:
-            idx = int(result.custom_id)
-        except ValueError:
-            continue
-        if not 0 <= idx < len(targets):
-            continue
-        job = targets[idx]
-        msg = result.result.message
-        text = next((blk.text for blk in msg.content if blk.type == "text"), "")
-        try:
-            data = json.loads(text)
-        except json.JSONDecodeError:
-            continue
-        _apply(job, data)
-        ok += 1
+    for job, data in zip(targets, results):
+        if isinstance(data, dict):
+            _apply(job, data)
+            ok += 1
     if verbose:
         print("[extract] enriched %d/%d jobs." % (ok, len(targets)))
     return jobs
 
 
 def enrich_sync(jobs: List[Job], *, limit: int = 5, verbose: bool = True) -> List[Job]:
-    """Synchronous enrichment of a few jobs, for local testing without batching."""
-    if not _has_credentials():
-        if verbose:
-            print("[extract] No credentials; skipping sync enrichment.")
-        return jobs
-    import anthropic
-
-    client = anthropic.Anthropic()
-    for job in jobs[:limit]:
-        params = _request_params(job)
-        msg = client.messages.create(**params)
-        text = next((blk.text for blk in msg.content if blk.type == "text"), "")
-        try:
-            _apply(job, json.loads(text))
-        except json.JSONDecodeError:
-            pass
-    return jobs
+    """Enrich only the first ``limit`` jobs -- a quick local check."""
+    return enrich_jobs(jobs, limit=limit, verbose=verbose)

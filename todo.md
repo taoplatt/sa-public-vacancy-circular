@@ -2,6 +2,45 @@
 
 Working notes so we can pick up quickly. Newest context at the top.
 
+## Status (2026-07-06): LLM stages moved to OpenRouter + custom-domain wired
+
+**Provider migration (done, in code).** Enrich + translate no longer use the
+Anthropic Message Batches API. New `pipeline/llm.py` is a thin OpenRouter client
+(OpenAI-compatible `/chat/completions`): structured `chat_json` (via
+`response_format: json_schema`, with a graceful fallback + tolerant JSON parse),
+plain `chat_text` for the UI catalogs, and a `map_concurrent` thread-pool
+fan-out that replaces Batch. `extract.py` / `translate.py` were rewritten on top
+of it (gap-fill retry kept); `anthropic` dropped from `requirements.txt`.
+- Env key is now `OPENROUTER_API_KEY` (was `ANTHROPIC_API_KEY`); model via
+  `PSVC_MODEL` (default `z-ai/glm-5.2`), concurrency via `PSVC_LLM_CONCURRENCY`.
+- Deterministic-first invariant preserved: no key -> stages skip, site builds.
+  Verified `--build-only` -> 4 langs, 2316 pages, 575 jobs.
+- Workflow updated: `secrets.OPENROUTER_API_KEY` + `vars.PSVC_MODEL`.
+- **Live smoke test passed** (2026-07-06, GLM 5.2): enrich returns clean JSON;
+  af + zu translations both succeed 2/2. IMPORTANT gotcha found + fixed: GLM 5.2
+  is a *reasoning* model, and reasoning tokens ate the `max_tokens` budget so the
+  JSON came back empty (enrich 0/1, translate 0/2). Fix: `llm.py` now sends
+  `reasoning: {enabled: false}` by default (override `PSVC_REASONING_EFFORT`);
+  token ceilings nudged up (enrich 800, translate 6000, gap-fill 10000).
+- Still heavier/slower per call than Haiku across ~2,300 requests/circular --
+  measure cost + timing on the first full run, swap `PSVC_MODEL` if it bites.
+  Partially addresses section 1's cheaper-model goal (flexibility done; $ TBD).
+
+**Custom domain (repo side wired; domain not registered yet).** `build.py` now
+writes `site/CNAME` from `PSVC_DOMAIN`; workflow passes `vars.CUSTOM_DOMAIN`.
+Verified locally (CNAME at root only, not in language subtrees).
+
+**Action items for the user (both changes):**
+- [ ] Add the `OPENROUTER_API_KEY` **repo secret** (local `.env` is set + smoke
+      tested, but CI has no OpenRouter secret yet), then run a manual dispatch
+      (not `build_only`) to validate the full enrich+translate path on CI. The
+      old `ANTHROPIC_API_KEY` repo secret is now unused and can be deleted.
+- [ ] Register a domain, set `CUSTOM_DOMAIN` repo var + the same domain in
+      Settings -> Pages (for HTTPS), and add DNS (subdomain -> CNAME to
+      `taoplatt.github.io`; apex -> GitHub's four A records 185.199.108-111.153).
+
+---
+
 ## Status (as of 2026-07-04)
 
 Multilingual support shipped to `main` (commit `9241983`): the site builds in
@@ -39,8 +78,12 @@ Two operational notes from the first real run:
 ## Tomorrow
 
 ### 1. Optimise the full translation pipeline
-- [ ] **Move off Claude Haiku to a much cheaper / open-source model (COST PRIORITY).**
-      Full enrich+translate is ~$8/circular on Haiku Batch. Goal: cut this hard,
+- [~] **Move off Claude Haiku to a much cheaper / open-source model (COST PRIORITY).**
+      Provider is now OpenRouter (model = `PSVC_MODEL`, default GLM 5.2); see the
+      2026-07-06 status. Remaining: measure real $/circular and settle on the
+      cheapest model that keeps isiZulu/isiXhosa quality. The constraints below
+      still apply to whatever model is chosen.
+      Full enrich+translate was ~$8/circular on Haiku Batch. Goal: cut this hard,
       ideally to ~free / self-hosted. Constraints from the earlier free-MT
       discussion:
       - The African languages gate the choice: isiZulu/isiXhosa rule out
@@ -89,8 +132,11 @@ Deployed the verified 100% build via a `build_only` workflow_dispatch (no API
 spend). All four language trees serve HTTP 200; translations, `hreflang` and the
 MT notice verified on the live site.
 - [x] Enable GitHub Pages (Source: GitHub Actions) -- done via API (`build_type=workflow`).
-- [ ] **Add the `ANTHROPIC_API_KEY` repository secret.** STILL PENDING -- needed
-      for the weekly scheduled run (full fetch/enrich/translate). Until it is set,
+- [ ] **Add the `OPENROUTER_API_KEY` repository secret.** STILL PENDING -- needed
+      for the weekly scheduled run (full fetch/enrich/translate). The old
+      `ANTHROPIC_API_KEY` secret is set but now unused (pipeline moved to
+      OpenRouter 2026-07-06) and can be deleted. Until the OpenRouter secret is
+      set,
       a scheduled run builds any new circular English-only; existing committed
       translations still serve, so nothing breaks. NOTE: the skip guard (commit
       `6750924`) now makes the weekly cron a cheap no-op until a genuinely new
@@ -102,8 +148,11 @@ MT notice verified on the live site.
 - [x] Verify the live site: four language trees, `hreflang` alternates
       (en/af/xh/zu/x-default), MT notice on non-English only, job pages load,
       JS-off works (cards are server-rendered).
-- [ ] Decide on a **custom domain** (nicer for sharing) + HTTPS. (Pages already
-      enforces HTTPS on the github.io URL.)
+- [~] **Custom domain** (nicer for sharing) + HTTPS. Repo side wired 2026-07-06:
+      `build.py` emits `site/CNAME` from `PSVC_DOMAIN`; workflow passes
+      `vars.CUSTOM_DOMAIN`. Remaining: register the domain, set `CUSTOM_DOMAIN` +
+      the domain in Settings -> Pages + DNS records. (Pages already enforces
+      HTTPS on the github.io URL.)
 - [x] Payload sanity (low-bandwidth): index ~36-47KB gzipped, job pages ~5.5KB,
       css 4KB + js 2.2KB. Index raw ~480KB but served gzipped and renders all 575
       cards for JS-off -- revisit with pagination only if it grows.

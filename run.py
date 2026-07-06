@@ -29,8 +29,9 @@ DATA_DIR = "data/circulars"
 def _load_dotenv(path: str = ".env") -> None:
     """Load KEY=VALUE lines from a local .env into the environment (no overwrite).
 
-    Lets you keep ANTHROPIC_API_KEY in a git-ignored .env instead of exporting
-    it each shell. Existing environment variables always win.
+    Lets you keep OPENROUTER_API_KEY (and PSVC_MODEL/PSVC_DOMAIN) in a
+    git-ignored .env instead of exporting them each shell. Existing environment
+    variables always win.
     """
     if not os.path.exists(path):
         return
@@ -121,7 +122,7 @@ def main() -> None:
     ap.add_argument("--out", default="site", help="Output directory (default: site).")
     args = ap.parse_args()
 
-    _load_dotenv()  # pick up ANTHROPIC_API_KEY from a local .env if present
+    _load_dotenv()  # pick up OPENROUTER_API_KEY / PSVC_* from a local .env if present
 
     if args.translate_ui:
         translate.translate_ui_catalogs()

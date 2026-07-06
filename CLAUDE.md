@@ -45,16 +45,33 @@ jobs=parse_all(segment_pdf('PSV CIRCULAR 23 of 2026.pdf')); print(len(jobs),'job
 
 ## The API key
 
-The Anthropic SDK reads `ANTHROPIC_API_KEY` from the environment. Two places:
+Enrichment and translation call **OpenRouter** (an OpenAI-compatible gateway in
+front of many models), which reads `OPENROUTER_API_KEY` from the environment.
+The model is chosen with `PSVC_MODEL` (any OpenRouter slug; default
+`z-ai/glm-5.2`). Two places:
 
 - **Local:** copy `.env.example` to `.env` and paste the key. `run.py` auto-loads
-  `.env` (git-ignored). Or `export ANTHROPIC_API_KEY=sk-ant-...` in your shell.
+  `.env` (git-ignored). Or `export OPENROUTER_API_KEY=sk-or-...` in your shell.
 - **CI:** repo **Settings → Secrets and variables → Actions → New repository
-  secret**, named `ANTHROPIC_API_KEY`. The workflow already references it.
+  secret**, named `OPENROUTER_API_KEY`. Optionally set `PSVC_MODEL` as a
+  repository **variable** to pin a model. The workflow already references both.
 
 Without a key, `pipeline/extract.py` and `pipeline/translate.py` skip their work
 and the site still builds fully from the deterministic parse (in English; the
 other-language trees fall back to English content).
+
+OpenRouter has **no batch endpoint**, so both stages issue ordinary synchronous
+requests fanned out over a small thread pool (`pipeline/llm.py`, tune with
+`PSVC_LLM_CONCURRENCY`). Structured output uses `response_format: json_schema`,
+falling back to tolerant JSON parsing for models that don't support it. Note the
+default `z-ai/glm-5.2` is a *reasoning* model (heavier per call than a small
+translation model); swap `PSVC_MODEL` for something cheaper if cost/latency bites.
+
+**Reasoning is disabled by default** (`llm.py:_reasoning_config`). On a reasoning
+model the chain-of-thought consumes the `max_tokens` budget and the JSON answer
+truncates to empty -- so these mechanical extract/translate calls send
+`reasoning: {enabled: false}`. Re-enable per-deployment with
+`PSVC_REASONING_EFFORT=low|medium|high` if a future model needs it.
 
 ## Architecture
 
@@ -64,8 +81,9 @@ other-language trees fall back to English content).
 | `pipeline/fetch.py` | Discover + download the newest circular PDF from DPSA |
 | `pipeline/segment.py` | `pdftotext -layout` → one raw text block per post (+ inherited dept context) |
 | `pipeline/parse.py` | Raw block → complete `Job` (deterministic; no API call) |
-| `pipeline/extract.py` | Optional Claude Haiku 4.5 Batch enrichment, merged onto parsed jobs |
-| `pipeline/translate.py` | Optional Claude Haiku 4.5 Batch translation (af/zu/xh) into `Job.translations`; also `--translate-ui` for the chrome catalogs |
+| `pipeline/llm.py` | OpenRouter client: structured `chat_json`, plain `chat_text`, and a `map_concurrent` fan-out; reads `OPENROUTER_API_KEY` / `PSVC_MODEL` |
+| `pipeline/extract.py` | Optional LLM enrichment (via `llm.py`), merged onto parsed jobs |
+| `pipeline/translate.py` | Optional LLM translation (af/zu/xh) into `Job.translations`; also `--translate-ui` for the chrome catalogs |
 | `pipeline/build.py` | Jinja2 → static `site/`, once per language (en at root, `af`/`zu`/`xh` subtrees) |
 | `run.py` | Orchestrator + `.env` loader |
 | `templates/`, `static/` | Jinja2 templates; `style.css` + `filter.js` |
@@ -123,5 +141,13 @@ other-language trees fall back to English content).
 `.github/workflows/update.yml` runs weekly (+ manual dispatch): fetch → enrich →
 translate → commit new `data/circulars` JSON (translations included inline) →
 deploy `site/` to GitHub Pages. Enable Pages (Settings → Pages → Source: GitHub
-Actions) and add the `ANTHROPIC_API_KEY` secret. The `i18n/` chrome catalogs are
+Actions) and add the `OPENROUTER_API_KEY` secret. The `i18n/` chrome catalogs are
 committed and regenerated manually with `--translate-ui`, not on every run.
+
+**Custom domain.** Set the `CUSTOM_DOMAIN` repo **variable** (Settings → Secrets
+and variables → Actions → Variables) to the bare host, e.g. `jobs.example.com`.
+The workflow passes it as `PSVC_DOMAIN`, and `build.py` writes `site/CNAME` so
+the domain survives every deploy. Also set the same domain in Settings → Pages
+(so GitHub provisions the TLS cert and enforces HTTPS) and add the DNS records at
+your registrar: a **subdomain** → one `CNAME` to `taoplatt.github.io`; an
+**apex** → GitHub's four `A` records (185.199.108–111.153) plus a `www` CNAME.

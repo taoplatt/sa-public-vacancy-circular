@@ -167,6 +167,23 @@ def _copy_static(out_dir: str) -> None:
     shutil.copytree(STATIC_DIR, dst)
 
 
+def _write_cname(out_dir: str) -> None:
+    """Emit a CNAME at the site root when a custom domain is configured.
+
+    GitHub Pages (deployed via Actions) needs a CNAME file in the published
+    artifact for a custom domain to stick across deploys. Set ``PSVC_DOMAIN``
+    (locally in ``.env``, or as the ``CUSTOM_DOMAIN`` repo variable in CI) to the
+    bare host, e.g. ``jobs.example.com``. With no domain set, no file is written
+    and the default ``*.github.io`` URL is used.
+    """
+    domain = (os.environ.get("PSVC_DOMAIN") or "").strip()
+    if not domain:
+        return
+    with open(os.path.join(out_dir, "CNAME"), "w", encoding="utf-8") as fh:
+        fh.write(domain + "\n")
+    print("[build] wrote CNAME -> %s" % domain)
+
+
 def _write(out_dir: str, rel_path: str, html: str) -> None:
     path = os.path.join(out_dir, rel_path)
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -199,6 +216,8 @@ def build_site(circulars: List[Circular], out_dir: str = "site") -> None:
         tree_dir = out_dir if lang == "en" else os.path.join(out_dir, lang)
         _build_tree(env, circulars, latest, tree_dir, lang,
                     _load_catalog(lang), today, soon_cutoff)
+
+    _write_cname(out_dir)  # custom domain (PSVC_DOMAIN), site root only
 
     total_jobs = sum(len(c.jobs) for c in circulars)
     pages_per_lang = 2 + len(circulars) * 2 + total_jobs
