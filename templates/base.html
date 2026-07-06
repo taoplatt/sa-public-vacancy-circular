@@ -35,10 +35,31 @@
         <a href="{{ root }}about.html"{% if nav == 'about' %} aria-current="page"{% endif %}>{{ t.nav_about }}</a>
       </nav>
       <nav class="lang-nav" aria-label="{{ t.lang_switcher_label }}">
-        {% for code, href in alternates %}
-        {% if code == lang %}<span class="lang-current" aria-current="true">{{ t.lang_names[code] }}</span>
-        {% else %}<a href="{{ href }}" hreflang="{{ code }}">{{ t.lang_names[code] }}</a>{% endif %}
-        {% endfor %}
+        <details class="lang-menu">
+          <summary aria-label="{{ t.lang_switcher_label }}: {{ t.lang_names[lang] }}">
+            <svg class="lang-menu-globe" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                 aria-hidden="true">
+              <circle cx="12" cy="12" r="9"></circle>
+              <path d="M3 12h18"></path>
+              <path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18"></path>
+            </svg>
+            <span class="lang-menu-label">{{ t.lang_names[lang] }}</span>
+            <svg class="lang-menu-caret" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
+                 aria-hidden="true">
+              <path d="M6 9l6 6 6-6"></path>
+            </svg>
+          </summary>
+          <ul class="lang-menu-list">
+            {% for code, href in alternates %}
+            <li>
+              {% if code == lang %}<span class="lang-menu-item is-current" aria-current="true">{{ t.lang_names[code] }}</span>
+              {% else %}<a class="lang-menu-item" href="{{ href }}" hreflang="{{ code }}">{{ t.lang_names[code] }}</a>{% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+        </details>
       </nav>
     </div>
   </header>
