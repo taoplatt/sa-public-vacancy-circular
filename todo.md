@@ -31,10 +31,12 @@ writes `site/CNAME` from `PSVC_DOMAIN`; workflow passes `vars.CUSTOM_DOMAIN`.
 Verified locally (CNAME at root only, not in language subtrees).
 
 **Action items for the user (both changes):**
-- [ ] Add the `OPENROUTER_API_KEY` **repo secret** (local `.env` is set + smoke
-      tested, but CI has no OpenRouter secret yet), then run a manual dispatch
-      (not `build_only`) to validate the full enrich+translate path on CI. The
-      old `ANTHROPIC_API_KEY` repo secret is now unused and can be deleted.
+- [x] Add the `OPENROUTER_API_KEY` **repo secret**. DONE 2026-07-06 (set via
+      `gh secret set` from the local `.env`). The full enrich+translate path is
+      not yet exercised on CI: the skip guard means a dispatch only processes a
+      *new* circular, and 23/2026 is already archived -- so the next new circular
+      (or a `--force` run) is the first CI run that spends OpenRouter credit.
+      The old `ANTHROPIC_API_KEY` repo secret is now unused and can be deleted.
 - [ ] Register a domain, set `CUSTOM_DOMAIN` repo var + the same domain in
       Settings -> Pages (for HTTPS), and add DNS (subdomain -> CNAME to
       `taoplatt.github.io`; apex -> GitHub's four A records 185.199.108-111.153).
@@ -132,11 +134,11 @@ Deployed the verified 100% build via a `build_only` workflow_dispatch (no API
 spend). All four language trees serve HTTP 200; translations, `hreflang` and the
 MT notice verified on the live site.
 - [x] Enable GitHub Pages (Source: GitHub Actions) -- done via API (`build_type=workflow`).
-- [ ] **Add the `OPENROUTER_API_KEY` repository secret.** STILL PENDING -- needed
-      for the weekly scheduled run (full fetch/enrich/translate). The old
-      `ANTHROPIC_API_KEY` secret is set but now unused (pipeline moved to
-      OpenRouter 2026-07-06) and can be deleted. Until the OpenRouter secret is
-      set,
+- [x] **Add the `OPENROUTER_API_KEY` repository secret.** DONE 2026-07-06 (set
+      via `gh secret set` from the local `.env`); the weekly scheduled run can now
+      enrich/translate a new circular. The old `ANTHROPIC_API_KEY` secret is set
+      but now unused (pipeline moved to OpenRouter 2026-07-06) and can be deleted.
+      Historical note: before the secret was set,
       a scheduled run builds any new circular English-only; existing committed
       translations still serve, so nothing breaks. NOTE: the skip guard (commit
       `6750924`) now makes the weekly cron a cheap no-op until a genuinely new
