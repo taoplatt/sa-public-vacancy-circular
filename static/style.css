@@ -221,8 +221,15 @@ select.control { appearance: none; -webkit-appearance: none;
 
 /* ---- Footer ---- */
 .site-footer { background: var(--grad-header); color: #fff; margin-top: 2rem; padding: 1.9rem 0; font-size: 0.85rem; }
+.site-footer .wrap { display: flex; justify-content: space-between; align-items: flex-end; gap: 1.5rem; flex-wrap: wrap; }
 .site-footer a { color: var(--gold-soft); }
 .site-footer p { margin: 0.3rem 0; opacity: 0.92; max-width: var(--measure); }
+.footer-powered { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 0.15rem; color: var(--gold-soft); text-decoration: none; flex-shrink: 0; }
+.footer-powered:hover .footer-powered-name { text-decoration: underline; }
+.footer-powered-label { font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.72; }
+.footer-powered-brand { display: inline-flex; align-items: center; gap: 0.4rem; }
+.footer-powered-mark { flex-shrink: 0; }
+.footer-powered-name { font-size: 1.25rem; line-height: 1; }
 
 /* ---- Responsive ---- */
 @media (min-width: 720px) { .hero h1 { font-size: 2.6rem; } }
