@@ -237,8 +237,15 @@ def _build_tree(env, circulars, latest, out_dir, lang, t, today, soon_cutoff):
     def base_ctx(root, base_rel, nav):
         alternates = _alternates(lang, root, base_rel)
         en_href = next(href for code, href in alternates if code == "en")
+        # Canonical path for analytics (matches the browser path the JS beacon
+        # records: homepage is "/" or "/<lang>/", not "/index.html").
+        prefix = "" if lang == "en" else lang + "/"
+        page_path = "/" + prefix + base_rel
+        if page_path.endswith("/index.html"):
+            page_path = page_path[: -len("index.html")]
         return dict(root=root, nav=nav, favicon=FAVICON, t=t, lang=lang,
-                    html_lang=html_lang, alternates=alternates, en_href=en_href)
+                    html_lang=html_lang, alternates=alternates, en_href=en_href,
+                    page_path=page_path)
 
     def render_listing(circ, *, root, job_prefix, base_rel):
         jobs = _sorted_jobs(circ, today)

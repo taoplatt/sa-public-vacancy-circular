@@ -94,5 +94,12 @@
   </footer>
 
   {% block scripts %}{% endblock %}
+
+  {# Analytics: GoatCounter -- privacy-friendly, no cookies, no consent banner.
+     The async beacon counts JS-on visitors; the <noscript> pixel counts JS-off
+     visitors, using this page's canonical path so counts stay accurate. #}
+  <script data-goatcounter="https://publicsectorjobsza.goatcounter.com/count"
+          async src="//gc.zgo.at/count.js"></script>
+  <noscript><img src="https://publicsectorjobsza.goatcounter.com/count?p={{ page_path }}" alt="" width="1" height="1"></noscript>
 </body>
 </html>
