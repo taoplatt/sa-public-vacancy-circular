@@ -1,0 +1,11 @@
+"HOW TO USE THIS CALCULATOR: one row per offer. Hours estimate means EVERY hour the job takes (design time, calls, messages, revisions, travel). Target hourly rate is what you want to earn per hour; GBP 20 to 35 is a sensible UK beginner band. The suggested price column multiplies hours by rate and adds expenses automatically. Round the suggestion to a clean number (nearest GBP 5 under 100, nearest GBP 25 over) and type it in the last column. Quote clients ONLY the fixed price, never the hourly rate. After each real project, replace your estimate with the true hours and check what you actually earned per hour.",,,,,
+,,,,,
+Offer name,Hours estimate (all hours),Target hourly rate (GBP),Materials and expenses (GBP),Suggested fixed price (GBP),Price you will charge (GBP)
+Mini moodboard (one room),3,25,0,=B4*C4+D4,75
+Colour consultation (90 mins in person plus written colour plan),4,25,10,=B5*C5+D5,110
+Single-room e-design package (board plus layout plus shopping list),10,25,0,=B6*C6+D6,250
+Room refresh day (one day in person plus prep and sourcing),9,30,15,=B7*C7+D7,295
+Styling for sellers (walk-through plus room-by-room report),5,28,10,=B8*C8+D8,150
+Your offer 1,,,,=B9*C9+D9,
+Your offer 2,,,,=B10*C10+D10,
+Your offer 3,,,,=B11*C11+D11,
