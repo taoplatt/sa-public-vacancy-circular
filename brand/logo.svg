@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 96" role="img" aria-label="Maison Method">
+  <!-- Mark: an arched doorway, the moment you step into the work -->
+  <g stroke="#C4602F" stroke-width="5" fill="none" stroke-linecap="round">
+    <path d="M 26 74 V 40 A 22 22 0 0 1 70 40 V 74" />
+    <line x1="16" y1="74" x2="80" y2="74" />
+  </g>
+  <circle cx="48" cy="46" r="5" fill="#7E8D77" />
+  <!-- Wordmark: system serif keeps the SVG font-free in spirit; Georgia is near-universal -->
+  <text x="100" y="60" font-family="Georgia, 'Times New Roman', serif" font-size="38" fill="#221F1C">Maison <tspan font-style="italic" fill="#C4602F">Method</tspan></text>
+</svg>

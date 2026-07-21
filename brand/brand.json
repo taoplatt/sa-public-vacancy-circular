@@ -1,0 +1,49 @@
+{
+  "name": "Maison Method",
+  "legal_name": "Maison Method",
+  "tagline": "Turn your eye for interiors into income",
+  "promise": "Everything you need to go from loving interiors to landing your first paying client",
+  "domain": "maisonmethod.com",
+  "site_url": "https://maisonmethod.com",
+  "language": "en-GB",
+  "market": "UK/Europe",
+
+  "product": {
+    "name": "The First Client Kit",
+    "price": "£12",
+    "checkout_url": "TODO_PAYHIP_PRODUCT_URL"
+  },
+
+  "waitlist": {
+    "provider": "mailerlite",
+    "form_action": "TODO_MAILERLITE_FORM_ACTION_URL",
+    "success_url": "/thanks.html",
+    "notes": "See ops/setup.md step 2. Until the real form action is set, the form falls back to a mailto: so the site never dead-ends."
+  },
+
+  "analytics": {
+    "goatcounter_code": "TODO_GOATCOUNTER_CODE",
+    "meta_pixel_id": "TODO_META_PIXEL_ID"
+  },
+
+  "social": {
+    "tiktok": "@maisonmethod",
+    "instagram": "@maisonmethod",
+    "pinterest": "maisonmethod"
+  },
+
+  "colors": {
+    "ink": "#221F1C",
+    "plaster": "#F1E9DE",
+    "terracotta": "#C4602F",
+    "sage": "#7E8D77",
+    "cream": "#FAF6EF",
+    "line": "#DDD2C2"
+  },
+
+  "fonts": {
+    "display": "Georgia, 'Times New Roman', serif",
+    "body": "Georgia, 'Times New Roman', serif",
+    "notes": "System serif only: zero font payload, editorial feel. Do not add web fonts without checking page weight budget in README."
+  }
+}

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ brand.name }} · {{ brand.tagline }}{% endblock %}</title>
+<meta name="description" content="{% block description %}{{ brand.promise }}. Join the waitlist.{% endblock %}">
+<meta property="og:title" content="{{ self.title() }}">
+<meta property="og:description" content="{{ self.description() }}">
+<meta property="og:type" content="website">
+<link rel="icon" href="static/favicon.svg" type="image/svg+xml">
+<style>
+:root{
+  --ink: {{ brand.colors.ink }};
+  --plaster: {{ brand.colors.plaster }};
+  --terracotta: {{ brand.colors.terracotta }};
+  --sage: {{ brand.colors.sage }};
+  --cream: {{ brand.colors.cream }};
+  --line: {{ brand.colors.line }};
+  --display: {{ brand.fonts.display }};
+  --body: {{ brand.fonts.body }};
+}
+</style>
+<link rel="stylesheet" href="static/style.css">
+{% if goatcounter %}<script data-goatcounter="https://{{ goatcounter }}.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>{% endif %}
+</head>
+<body data-pixel-id="{{ pixel_id }}" data-pixel-event="{% block pixel_event %}PageView{% endblock %}">
+
+<header class="wrap topbar">
+  <a class="brandmark" href="index.html" aria-label="{{ brand.name }} home">
+    <img src="static/logo.svg" alt="{{ brand.name }}" width="220" height="48">
+  </a>
+  {% block header_cta %}<a class="btn btn-small" href="#waitlist">Join the waitlist</a>{% endblock %}
+</header>
+
+<main>
+{% block content %}{% endblock %}
+</main>
+
+<footer class="wrap footer">
+  <p>Made for people who rearrange other people's furniture in their heads.</p>
+  <p>
+    <a href="privacy.html">Privacy</a>
+    · TikTok {{ brand.social.tiktok }}
+    · Instagram {{ brand.social.instagram }}
+  </p>
+  <p>© {{ year }} {{ brand.name }}</p>
+</footer>
+
+{% if pixel_id %}
+<div class="consent" id="consent" hidden>
+  <p>We would like to use one Meta cookie to measure whether our ads work. Nothing else is tracked with cookies.</p>
+  <div class="consent-actions">
+    <button class="btn btn-small" id="consent-yes">That's fine</button>
+    <button class="btn btn-small btn-ghost" id="consent-no">No thanks</button>
+  </div>
+</div>
+<script src="static/consent.js" defer></script>
+{% endif %}
+
+</body>
+</html>

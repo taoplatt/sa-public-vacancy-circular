@@ -1,0 +1,144 @@
+/* Maison Method. Tokens arrive as CSS custom properties injected by build.py
+   from brand/brand.json (see templates/base.html). Editorial, warm, light. */
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: var(--body);
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--ink);
+  background: var(--plaster);
+}
+
+.wrap { max-width: 62rem; margin: 0 auto; padding: 0 1.25rem; }
+
+h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.15; margin: 0 0 .6em; }
+h1 { font-size: clamp(2.1rem, 6vw, 3.4rem); letter-spacing: -0.01em; }
+h2 { font-size: clamp(1.5rem, 4vw, 2.1rem); }
+h3 { font-size: 1.15rem; }
+p { margin: 0 0 1em; }
+a { color: var(--terracotta); }
+
+/* Header */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-top: 1.1rem; padding-bottom: 1.1rem; gap: 1rem;
+}
+.brandmark img { display: block; height: 42px; width: auto; }
+
+/* Hero */
+.hero { padding: 3.5rem 1.25rem 3rem; text-align: left; }
+.kicker {
+  color: var(--terracotta);
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  font-size: .78rem;
+  margin-bottom: 1rem;
+}
+.lede { font-size: 1.2rem; max-width: 38em; }
+.smallprint { font-size: .85rem; color: #6b6257; max-width: 38em; }
+
+/* Bands alternate background */
+.band { background: var(--cream); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 3rem 0; }
+.section { padding: 3rem 1.25rem; }
+.section-lede { max-width: 38em; color: #55503f; }
+
+/* Cards and grids */
+.cols3 { display: grid; gap: 1rem; grid-template-columns: 1fr; margin-top: 1.5rem; }
+@media (min-width: 720px) { .cols3 { grid-template-columns: repeat(3, 1fr); } }
+.card {
+  background: var(--plaster);
+  border: 1px solid var(--line);
+  border-radius: 120px 120px 14px 14px; /* the arch */
+  padding: 2.4rem 1.4rem 1.4rem;
+  text-align: center;
+}
+.card h3 { color: var(--terracotta); }
+.item { border-top: 2px solid var(--terracotta); padding-top: .9rem; }
+.item h3 { margin-bottom: .3em; }
+
+/* Steps */
+.steps { max-width: 40em; padding-left: 1.2em; }
+.steps li { margin-bottom: 1em; }
+
+/* Permission fact */
+.permission { text-align: center; }
+.bigfact {
+  font-size: clamp(1.25rem, 3vw, 1.6rem);
+  font-style: italic;
+  max-width: 30em;
+  margin: 0 auto 1em;
+}
+.permission p:last-child { color: #55503f; }
+
+/* FAQ */
+.faq { max-width: 42em; }
+.faq dt { font-weight: 700; margin-top: 1.4em; }
+.faq dd { margin: .4em 0 0; color: #453f33; }
+
+/* Forms */
+.signup { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1.6rem 0 .8rem; max-width: 34rem; }
+.signup input[type="email"] {
+  flex: 1 1 14rem;
+  font: inherit;
+  padding: .8rem 1rem;
+  border: 1.5px solid var(--ink);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+}
+.signup input[type="email"]:focus { outline: 3px solid var(--sage); outline-offset: 1px; }
+
+/* Buttons */
+.btn {
+  display: inline-block;
+  font: inherit;
+  background: var(--terracotta);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: .8rem 1.5rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+.btn:hover { background: #a94e22; }
+.btn-small { padding: .5rem 1rem; font-size: .92rem; }
+.btn-ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--ink); }
+.btn-ghost:hover { background: var(--line); }
+
+/* Tripwire */
+.tripwire .ticks { list-style: none; padding: 0; max-width: 36em; }
+.tripwire .ticks li { padding-left: 1.6em; position: relative; margin-bottom: .55em; }
+.tripwire .ticks li::before { content: "✓"; position: absolute; left: 0; color: var(--sage); font-weight: 700; }
+
+/* Final CTA */
+.final-cta { text-align: left; }
+
+/* Footer */
+.footer { padding-top: 2.5rem; padding-bottom: 2.5rem; font-size: .9rem; color: #6b6257; }
+.footer a { color: inherit; }
+
+/* Prose pages (privacy) */
+.prose { max-width: 42em; }
+
+/* Consent banner */
+.consent {
+  position: fixed; left: 1rem; right: 1rem; bottom: 1rem;
+  max-width: 26rem; margin: 0 auto;
+  background: var(--ink); color: var(--plaster);
+  border-radius: 12px; padding: 1rem 1.2rem;
+  box-shadow: 0 8px 30px rgba(0,0,0,.25);
+  font-size: .92rem;
+}
+.consent p { margin-bottom: .8em; }
+.consent-actions { display: flex; gap: .6rem; }
+.consent .btn-ghost { color: var(--plaster); border-color: var(--plaster); }
+
+/* Utilities */
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px;
+  clip: rect(0 0 0 0); clip-path: inset(50%);
+  overflow: hidden; white-space: nowrap;
+}

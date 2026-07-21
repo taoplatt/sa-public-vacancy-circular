@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}You're on the list · {{ brand.name }}{% endblock %}
+{% block description %}Welcome to the {{ brand.name }} waitlist.{% endblock %}
+{% block pixel_event %}Lead{% endblock %}
+{% block header_cta %}{% endblock %}
+
+{% block content %}
+
+<section class="hero wrap">
+  <p class="kicker">You're on the list</p>
+  <h1>Good decision. Here's what happens next.</h1>
+  <p class="lede">
+    You will get one email confirming your spot, then quiet, useful updates
+    while we finish the kit. Founding members hear first and pay the
+    founding price. That is the whole deal.
+  </p>
+</section>
+
+<section class="band">
+  <div class="wrap tripwire">
+    <p class="kicker">While you wait</p>
+    <h2>The First Client Kit · {{ brand.product.price }}</h2>
+    <p class="section-lede">
+      The first piece of {{ brand.name }}, ready today. A tight, practical
+      kit that gets you moving before the full box ships:
+    </p>
+    <ul class="ticks">
+      <li>The 30-day first-client roadmap, week by week</li>
+      <li>Beginner pricing guide for the UK and Europe, with calculator</li>
+      <li>Word-for-word outreach scripts (built for introverts)</li>
+      <li>Proposal, questionnaire, agreement and invoice templates</li>
+      <li>The £0-a-month starter tool stack</li>
+    </ul>
+    {% if checkout_live %}
+    <a class="btn" href="{{ brand.product.checkout_url }}">Get the kit for {{ brand.product.price }}</a>
+    <p class="smallprint">Instant download. VAT handled at checkout. If it is not worth it, reply to any email within 14 days for a refund.</p>
+    {% else %}
+    <p class="bigfact">Available this week. It will land in your inbox the moment it is live, at {{ brand.product.price }} for waitlist members.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="wrap section">
+  <h2>One more thing</h2>
+  <p>We post the method in public. If you want the daily version, we are
+  <strong>{{ brand.social.tiktok }}</strong> on TikTok and
+  <strong>{{ brand.social.instagram }}</strong> on Instagram.</p>
+</section>
+
+{% endblock %}

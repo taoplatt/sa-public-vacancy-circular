@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Privacy · {{ brand.name }}{% endblock %}
+{% block description %}How {{ brand.name }} handles your data.{% endblock %}
+{% block header_cta %}{% endblock %}
+
+{% block content %}
+<section class="wrap section prose">
+  <h1>Privacy</h1>
+  <p>Short version: we collect your email address because you asked us to,
+  we count visits without cookies, and we only set a cookie if you say yes
+  to it.</p>
+
+  <h2>What we collect</h2>
+  <ul>
+    <li><strong>Your email address</strong>, when you join the waitlist. It is
+    stored with our email provider (MailerLite) and used to send you
+    {{ brand.name }} updates. Every email includes an unsubscribe link, and
+    unsubscribing deletes you from the list.</li>
+    <li><strong>Anonymous visit counts</strong>, via GoatCounter, which does
+    not use cookies and does not identify you.</li>
+    <li><strong>Ad measurement</strong>, via the Meta pixel, only if you
+    accept the cookie notice. This tells us whether our adverts led to
+    signups. Decline it and the site works identically.</li>
+  </ul>
+
+  <h2>What we never do</h2>
+  <ul>
+    <li>Sell or share your email with anyone.</li>
+    <li>Track you across other sites ourselves.</li>
+    <li>Keep your data after you ask us to remove it.</li>
+  </ul>
+
+  <h2>Payments</h2>
+  <p>If you buy a digital product, payment is processed by Payhip, who act
+  as the merchant of record. We never see your card details.</p>
+
+  <h2>Your rights</h2>
+  <p>Under UK and EU data protection law you can ask for a copy of your
+  data, correct it, or have it deleted. Email us at
+  hello@{{ brand.domain }} and it will be done within 30 days.</p>
+</section>
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<section class="hero wrap">
+  <p class="kicker">The starter system for new interior designers</p>
+  <h1>Turn your eye for interiors into income.</h1>
+  <p class="lede">
+    {{ brand.name }} is everything you need to go from loving interiors to
+    landing your first paying client. The templates, the pricing, the tools
+    and a 30-day roadmap. No degree required, because none is needed.
+  </p>
+
+  <form class="signup" id="waitlist" action="{{ form_action }}" method="{{ form_method }}" aria-label="Join the waitlist">
+    {{ form_hidden }}
+    <label class="visually-hidden" for="email">Email address</label>
+    <input type="email" id="email" name="{{ form_email_field }}" placeholder="you@example.com" required autocomplete="email">
+    <button class="btn" type="submit">Join the waitlist</button>
+  </form>
+  <p class="smallprint">Founding members get the full kit at the founding price when it launches. No spam, one or two emails a month, unsubscribe anytime.</p>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>Sound familiar?</h2>
+    <div class="cols3">
+      <div class="card">
+        <h3>The 6pm designer</h3>
+        <p>You have a day job and a camera roll full of rooms you would fix.
+        You want a real side income from it, not another hobby.</p>
+      </div>
+      <div class="card">
+        <h3>The escape planner</h3>
+        <p>You have known for a while that your career is not it. Interiors
+        keeps pulling. You want proof it can pay before you jump.</p>
+      </div>
+      <div class="card">
+        <h3>The school-hours studio</h3>
+        <p>You want work that is yours, fits around the family, and uses the
+        taste everyone already asks you for.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="wrap section">
+  <h2>What's in the box</h2>
+  <p class="section-lede">One kit, not seventeen tabs of conflicting advice.</p>
+  <div class="cols3">
+    <div class="item"><h3>The 30-day roadmap</h3><p>Week by week, from picking your lane to sending your first invoice. Built for evenings and school hours.</p></div>
+    <div class="item"><h3>Pricing that holds up</h3><p>Beginner fee guides for the UK and Europe, a pricing calculator, and the exact words for "that's expensive".</p></div>
+    <div class="item"><h3>Client paperwork, done</h3><p>Proposal, questionnaire, plain-English agreement and invoice templates. Copy, personalise, send.</p></div>
+    <div class="item"><h3>Portfolio without clients</h3><p>How to build three convincing pieces before anyone has paid you a penny.</p></div>
+    <div class="item"><h3>The tool stack</h3><p>The free and nearly-free tools that cover moodboards, layouts and payments. £0 a month to start.</p></div>
+    <div class="item"><h3>Pick-your-lane playbooks</h3><p>E-design, room refreshes, styling for sellers and landlords, colour consultations. Choose one, start there.</p></div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>How it works</h2>
+    <ol class="steps">
+      <li><strong>Pick your lane.</strong> One starter offer, one fixed price, one kind of client. The kit helps you choose in an evening.</li>
+      <li><strong>Follow the method.</strong> Thirty days of small, concrete steps. Portfolio first, then outreach scripts that work for introverts.</li>
+      <li><strong>Land the first client.</strong> Discovery call, quote, agreement, deposit. Everything is templated, down to the testimonial request.</li>
+    </ol>
+  </div>
+</section>
+
+<section class="wrap section permission">
+  <h2>The fact nobody leads with</h2>
+  <p class="bigfact">
+    In the UK and most of Europe, residential interior design is not a
+    protected profession. You do not need a degree or a licence to charge
+    for moodboards, e-design or room styling. You need taste, a process,
+    and a first client.
+  </p>
+  <p>Structural work is regulated and is not what this is. Everything else
+  has been waiting for you to start.</p>
+</section>
+
+<section class="wrap section">
+  <h2>Fair questions</h2>
+  <dl class="faq">
+    <dt>Do I need qualifications?</dt>
+    <dd>For residential design, e-design and styling in the UK and most of
+    the EU, no. Anything structural belongs to architects and engineers,
+    and the kit is clear about that line.</dd>
+    <dt>I have no portfolio. Is this still for me?</dt>
+    <dd>Especially for you. Week two of the roadmap builds a three-piece
+    portfolio before your first paying client, using rooms you already
+    have access to.</dd>
+    <dt>Is this a course?</dt>
+    <dd>No. Courses teach theory and take months. This is a working kit:
+    templates, prices, scripts and a sequence. You act on day one.</dd>
+    <dt>When does it launch, and what will it cost?</dt>
+    <dd>The full kit is in production now. Waitlist members see it first
+    and get the founding price, which only exists for the first group.</dd>
+    <dt>I'm not in the UK. Does it still apply?</dt>
+    <dd>The method is the same anywhere. Pricing guides are anchored to
+    the UK and Europe, with notes on adjusting to your local market.</dd>
+  </dl>
+</section>
+
+<section class="band final-cta">
+  <div class="wrap">
+    <h2>Be first through the door.</h2>
+    <p>Join the waitlist and get the founding price when {{ brand.name }} launches.</p>
+    <form class="signup" action="{{ form_action }}" method="{{ form_method }}" aria-label="Join the waitlist">
+      {{ form_hidden }}
+      <label class="visually-hidden" for="email2">Email address</label>
+      <input type="email" id="email2" name="{{ form_email_field }}" placeholder="you@example.com" required autocomplete="email">
+      <button class="btn" type="submit">Join the waitlist</button>
+    </form>
+  </div>
+</section>
+
+{% endblock %}
